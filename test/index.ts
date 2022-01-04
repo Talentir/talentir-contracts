@@ -1,36 +1,52 @@
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
+// Reference : https://ethereum-waffle.readthedocs.io/en/latest/matchers.html
 describe("Talentir", function () {
-  it("Test, async function ()", async function() {
+  let admin: SignerWithAddress;
+  let account1: SignerWithAddress;
+  let account2: SignerWithAddress;
+  let talentir: any;
+
+  beforeEach(async function () {
     const Talentir = await ethers.getContractFactory("Talentir");
-    const talentir = await Talentir.deploy();
+    talentir = await Talentir.deploy();
     await talentir.deployed();
 
-    const signers = await ethers.getSigners();
-    const adminAddress = await signers[0].getAddress();
-    const minterAddress = await signers[1].getAddress();
-    const user1Address = await signers[2].getAddress();
-    
+    [admin, account1, account2] = await ethers.getSigners();
+  });
 
-    // const mintTx = await talentir.safeMint(user1Address, "abcd");
-    const uri = "sdlkfje";
+  it("Roles", async function () {
+    const minterRole = await talentir.MINTER_ROLE();
+    const adminRole = await talentir.DEFAULT_ADMIN_ROLE();
+    await talentir.grantRole(minterRole, account1.address);
+
+    // Minter
+    expect(await talentir.hasRole(minterRole, account1.address)).to.equal(true);
+    expect(await talentir.hasRole(adminRole, account1.address)).to.equal(false);
+
+    // Admin
+    expect(await talentir.hasRole(adminRole, admin.address)).to.be.equal(true);
+    expect(await talentir.hasRole(minterRole, admin.address)).to.equal(true);
+
+    expect(await talentir.hasRole(adminRole, account2.address)).to.equal(false);
+    expect(await talentir.hasRole(minterRole, account2.address)).to.equal(true);
+  });
+
+  it("Minting", async function () {
+    const uri = "QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco";
     const tokenID = ethers.utils.sha256(ethers.utils.toUtf8Bytes(uri));
 
-    await expect(talentir.safeMint(user1Address, uri))
-      .to.emit(talentir, "Transfer").withArgs(ethers.constants.AddressZero, user1Address, tokenID)
+    await expect(talentir.safeMint(account1.address, uri))
+      .to.emit(talentir, "Transfer")
+      .withArgs(ethers.constants.AddressZero, account1.address, tokenID)
       .to.not.emit(talentir, "Approval");
-  
+
     expect(await talentir.tokenURI(tokenID)).to.equal("ipfs://" + uri);
-    expect(await talentir.tokenOfOwnerByIndex(user1Address, 0)).to.equal(tokenID);
 
-    // expect(await greeter.greet()).to.equal("Hello, world!");
-
-    // const setGreetingTx = await greeter.setGreeting("Hola, mundo!");
-
-    // // wait until the transaction is mined
-    // await setGreetingTx.wait();
-
-    // expect(await greeter.greet()).to.equal("Hola, mundo!");
+    await expect(talentir.safeMint(account1.address, uri)).to.be.revertedWith(
+      "ERC721: token already minted"
+    );
   });
 });
