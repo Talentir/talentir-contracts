@@ -1,13 +1,14 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import { Talentir } from "../typechain"
 
 // Reference : https://ethereum-waffle.readthedocs.io/en/latest/matchers.html
 describe("Talentir", function () {
   let admin: SignerWithAddress;
   let account1: SignerWithAddress;
   let account2: SignerWithAddress;
-  let talentir: any;
+  let talentir: Talentir;
 
   beforeEach(async function () {
     const Talentir = await ethers.getContractFactory("Talentir");
@@ -31,13 +32,13 @@ describe("Talentir", function () {
     expect(await talentir.hasRole(minterRole, admin.address)).to.equal(true);
 
     expect(await talentir.hasRole(adminRole, account2.address)).to.equal(false);
-    expect(await talentir.hasRole(minterRole, account2.address)).to.equal(true);
+    expect(await talentir.hasRole(minterRole, account2.address)).to.equal(false);
   });
 
   it("Minting", async function () {
-    const uri = "QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco";
+    const uri = "QmbWqxBEKC3P8tqsKc98xmWNzrzDtRLMiMPL8wBuTGsMnR";
     const tokenID = ethers.utils.sha256(ethers.utils.toUtf8Bytes(uri));
-
+    
     await expect(talentir.safeMint(account1.address, uri))
       .to.emit(talentir, "Transfer")
       .withArgs(ethers.constants.AddressZero, account1.address, tokenID)
