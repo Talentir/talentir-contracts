@@ -8,6 +8,7 @@ describe("Talentir", function () {
   let admin: SignerWithAddress;
   let account1: SignerWithAddress;
   let account2: SignerWithAddress;
+  let account3: SignerWithAddress;
   let talentir: Talentir;
 
   beforeEach(async function () {
@@ -15,7 +16,7 @@ describe("Talentir", function () {
     talentir = await Talentir.deploy();
     await talentir.deployed();
 
-    [admin, account1, account2] = await ethers.getSigners();
+    [admin, account1, account2, account3] = await ethers.getSigners();
   });
 
   it("Roles", async function () {
@@ -35,19 +36,53 @@ describe("Talentir", function () {
     expect(await talentir.hasRole(minterRole, account2.address)).to.equal(false);
   });
 
-  it("Minting", async function () {
-    const uri = "QmbWqxBEKC3P8tqsKc98xmWNzrzDtRLMiMPL8wBuTGsMnR";
-    const tokenID = ethers.utils.sha256(ethers.utils.toUtf8Bytes(uri));
+  it("Operations", async function () {
+    const uri1 = "QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1"
+    const uri2 = "QmPRRnZcj3PeWi8nDnM94KnbfsW5pscoY16B25YxCd7NWA";
+    const tokenID1 = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(uri1));
+    const tokenID2 = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(uri2));
     
-    await expect(talentir.safeMint(account1.address, uri))
+    // MARK: - MINTING
+    // Mint uri1 for account 1.
+    await expect(talentir.mint(account1.address, uri1, ethers.constants.AddressZero))
       .to.emit(talentir, "Transfer")
-      .withArgs(ethers.constants.AddressZero, account1.address, tokenID)
+      .withArgs(ethers.constants.AddressZero, account1.address, tokenID1)
       .to.not.emit(talentir, "Approval");
 
-    expect(await talentir.tokenURI(tokenID)).to.equal("ipfs://" + uri);
+    // Check if tokens exist and URI is correct.
+    expect(await talentir.tokenURI(tokenID1)).to.equal("ipfs://" + uri1);
+    await expect(talentir.tokenURI(tokenID2)).to.be.reverted;
 
-    await expect(talentir.safeMint(account1.address, uri)).to.be.revertedWith(
-      "ERC721: token already minted"
-    );
+    // Try minting same token again. It should revert.
+    await expect(talentir.mint(account2.address, uri1, ethers.constants.AddressZero))
+      .to.be.revertedWith("ERC721: token already minted")
+
+    // Mint uri2 for account 2.
+    await expect(talentir.mint(account2.address, uri2, ethers.constants.AddressZero))
+      .to.emit(talentir, "Transfer")
+      .withArgs(ethers.constants.AddressZero, account2.address, tokenID2);
+
+    // Check if tokens exist and URI is correct.
+    expect(await talentir.tokenURI(tokenID1)).to.equal("ipfs://" + uri1);
+    expect(await talentir.tokenURI(tokenID2)).to.equal("ipfs://" + uri2);
+
+    // MARK: - Transfer
+    // Admin shouldn't be allowed to transfer NFTs.
+    await expect(talentir.transferFrom(account2.address, account1.address, tokenID2)).to.be.reverted;
+    // account1 is also not owner, so shouldn't be allowed to transfer.
+    await expect(talentir.connect(account1).transferFrom(account2.address, account1.address, tokenID2)).to.be.reverted;
+    
+    await expect(talentir.connect(account2).transferFrom(account2.address, account1.address, tokenID2))
+      .to.emit(talentir, "Transfer")
+      .withArgs(account2.address, account1.address, tokenID2);
+
+    // Approve account3 so transfer for account1
+    await expect(talentir.connect(account1).setApprovalForAll(account3.address, true))
+      .to.emit(talentir, "ApprovalForAll")
+      .withArgs(account1.address, account3.address, true);
+    
+    // account3 is transfering tokenID1  to account2.
+    await expect (talentir.connect(account3).transferFrom(account1.address, account2.address, tokenID1))
+      .to.emit(talentir, "Transfer");
   });
 });
