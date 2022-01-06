@@ -22,4 +22,5 @@ jobs:
         node-version: '16'
         cache: 'npm'
     - run: npm install
+    - run: npm hardhat compile
     - run: npx hardhat test
