@@ -9,7 +9,6 @@ import "./TalentirRoyalties.sol";
 /// @custom:security-contact jk@talentir.com
 contract Talentir is ERC721, ERC721URIStorage, AccessControl, TalentirRoyalties {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    bytes32 public constant TRANSFER_ALL_ROLE = keccak256("TRANSFER_ALL_ROLE");
 
     constructor() ERC721("Talentir", "TAL") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -18,6 +17,13 @@ contract Talentir is ERC721, ERC721URIStorage, AccessControl, TalentirRoyalties 
 
     function _baseURI() internal pure override returns (string memory) {
         return "ipfs://";
+    }
+
+    address private _marketplaceAddress;
+
+    function updateMarketplaceAddress(address newAddress) public onlyRole(DEFAULT_ADMIN_ROLE)
+    {   
+        _marketplaceAddress = newAddress;
     }
 
     /**
@@ -36,7 +42,7 @@ contract Talentir is ERC721, ERC721URIStorage, AccessControl, TalentirRoyalties 
     }
 
     function isApprovedForAll(address owner, address operator) public view virtual override returns (bool) {
-        return hasRole(TRANSFER_ALL_ROLE, operator) || super.isApprovedForAll(owner, operator);
+        return _marketplaceAddress == operator || super.isApprovedForAll(owner, operator);
     }
 
     // The following functions are overrides required by Solidity.
