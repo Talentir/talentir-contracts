@@ -19,6 +19,14 @@ contract TalentirRoyalties is ERC165, IERC2981 {
         royaltyAmount = (value * ROYALTIES_PERCENTAGE) / 100;
     }
 
+    function updateRoyaltyReceiver(uint256 tokenId, address newRoyaltyReceiver)
+        public
+    {
+        address currentReceiver = _royaltyReceivers[tokenId];
+        require(currentReceiver == msg.sender, "Only current royalty receiver can update.");
+        _royaltyReceivers[tokenId] = newRoyaltyReceiver;
+    }
+
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165, IERC165) returns (bool) {
         return
             interfaceId == type(IERC2981).interfaceId ||

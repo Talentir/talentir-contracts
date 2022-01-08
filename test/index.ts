@@ -1,6 +1,7 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import { BytesLike } from "ethers";
 import { Talentir } from "../typechain"
 
 // Reference : https://ethereum-waffle.readthedocs.io/en/latest/matchers.html
@@ -44,17 +45,17 @@ describe("Talentir", function () {
   });
 
   it("Token URI to Token ID", async function () {
-    const tokenURI = "230r9jsaldkfjlksdfjFOI#)(RSADF<CV><XMCV>";
-    const tokenIDRef = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(tokenURI));
-    const tokenID = (await talentir.tokenUriToTokenID(tokenURI)).toString();
+    const tokenCID = "230r9jsaldkfjlksdfjFOI#)(RSADF<CV><XMCV>";
+    const tokenIDRef = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(tokenCID));
+    const tokenID = (await talentir.tokenCidToTokenID(tokenCID)).toString();
     expect(tokenID == tokenIDRef);
   });
 
   it("Marketplace address", async function () {
-    const uri1 = "QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1"
-    const tokenID1 = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(uri1));
+    const cid = "QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1"
+    const tokenID1 = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(cid));
 
-    await talentir.mint(account1.address, uri1, ethers.constants.AddressZero);
+    await talentir.mint(account1.address, cid, ethers.constants.AddressZero);
 
     await expect(talentir.connect(account3).transferFrom(account1.address, account2.address, tokenID1))
       .to.be.reverted;
@@ -70,8 +71,8 @@ describe("Talentir", function () {
   it("Minting", async function () {
     const uri1 = "QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1"
     const uri2 = "QmPRRnZcj3PeWi8nDnM94KnbfsW5pscoY16B25YxCd7NWA";
-    const tokenID1 = await talentir.tokenUriToTokenID(uri1);
-    const tokenID2 = await talentir.tokenUriToTokenID(uri2);
+    const tokenID1 = await talentir.tokenCidToTokenID(uri1);
+    const tokenID2 = await talentir.tokenCidToTokenID(uri2);
     
     // Mint uri1 for account 1.
     await expect(talentir.mint(account1.address, uri1, ethers.constants.AddressZero))
@@ -100,8 +101,8 @@ describe("Talentir", function () {
   it("Transfer", async function () {
     const uri1 = "QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1"
     const uri2 = "QmPRRnZcj3PeWi8nDnM94KnbfsW5pscoY16B25YxCd7NWA";
-    const tokenID1 = await talentir.tokenUriToTokenID(uri1);
-    const tokenID2 = await talentir.tokenUriToTokenID(uri2);
+    const tokenID1 = await talentir.tokenCidToTokenID(uri1);
+    const tokenID2 = await talentir.tokenCidToTokenID(uri2);
     await talentir.mint(account1.address, uri1, ethers.constants.AddressZero);
     await talentir.mint(account2.address, uri2, ethers.constants.AddressZero);
 
@@ -124,6 +125,35 @@ describe("Talentir", function () {
     // account3 is transfering tokenID1  to account2.
     await expect (talentir.connect(account3).transferFrom(account1.address, account2.address, tokenID1))
       .to.emit(talentir, "Transfer");
+  });
+
+  it("Royalties", async function () {
+    const cid = "QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1"
+    const tokenID1 = await talentir.tokenCidToTokenID(cid);
+
+    await talentir.mint(account1.address, cid, account2.address);
+    const result = await talentir.royaltyInfo(tokenID1, 100);
+    expect(result[0]).to.equal(account2.address);
+    expect(result[1]).to.equal(10);
+
+    await expect(talentir.updateRoyaltyReceiver(tokenID1, account3.address)).to.be.reverted;
+    await expect(talentir.connect(account1).updateRoyaltyReceiver(tokenID1, account3.address)).to.be.reverted;
+
+    // Only the current royalty receiver can update update
+    await expect(talentir.connect(account2).updateRoyaltyReceiver(tokenID1, account3.address)).not.to.be.reverted;
+  });
+
+  it("Interface", async function () {
+    let data: BytesLike[] = [];
+    data.push("0x01ffc9a7"); // IERC165
+    data.push("0x80ac58cd"); // IERC721
+    data.push("0x5b5e139f"); // IERC721Metadata
+    data.push("0x2a55205a"); // IERC2981
+    data.push("0x7965db0b"); // IAccessControl
+
+    data.forEach( async (element) => {
+      expect(await talentir.supportsInterface(element)).to.be.true;
+    })
   });
 });
 

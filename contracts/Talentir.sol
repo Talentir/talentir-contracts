@@ -21,12 +21,12 @@ contract Talentir is ERC721, ERC721URIStorage, AccessControl, TalentirRoyalties 
 
     address private _marketplaceAddress;
 
-    function tokenUriToTokenID(string memory uri) 
+    function tokenCidToTokenID(string memory cid) 
         public
         pure
         returns (uint256) 
     {
-        return uint256(keccak256(abi.encodePacked((uri))));
+        return uint256(keccak256(abi.encodePacked((cid))));
     }
 
     function updateMarketplaceAddress(address newAddress) public onlyRole(DEFAULT_ADMIN_ROLE)
@@ -39,13 +39,13 @@ contract Talentir is ERC721, ERC721URIStorage, AccessControl, TalentirRoyalties 
      * hash of the provided uri. This ensures that no duplicate uri's can be
      * minted.
      */
-    function mint(address to, string memory uri, address royaltyReceiver)
+    function mint(address to, string memory cid, address royaltyReceiver)
         public
         onlyRole(MINTER_ROLE)
     {
-        uint256 tokenId = tokenUriToTokenID(uri);
+        uint256 tokenId = tokenCidToTokenID(cid);
         _safeMint(to, tokenId);
-        _setTokenURI(tokenId, uri);
+        _setTokenURI(tokenId, cid);
         _setRoyaltiyReceiver(royaltyReceiver, tokenId);
     }
 
