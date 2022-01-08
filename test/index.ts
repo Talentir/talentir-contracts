@@ -43,7 +43,14 @@ describe("Talentir", function () {
     expect(await talentir.hasRole(minterRole, account2.address)).to.equal(false);
   });
 
-  it("Role: Approved For All", async function () {
+  it("Token URI to Token ID", async function () {
+    const tokenURI = "230r9jsaldkfjlksdfjFOI#)(RSADF<CV><XMCV>";
+    const tokenIDRef = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(tokenURI));
+    const tokenID = (await talentir.tokenUriToTokenID(tokenURI)).toString();
+    expect(tokenID == tokenIDRef);
+  });
+
+  it("Marketplace address", async function () {
     const uri1 = "QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1"
     const tokenID1 = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(uri1));
 
@@ -60,12 +67,11 @@ describe("Talentir", function () {
     expect(await talentir.ownerOf(tokenID1) == account2.address);
   });
 
-
   it("Minting", async function () {
     const uri1 = "QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1"
     const uri2 = "QmPRRnZcj3PeWi8nDnM94KnbfsW5pscoY16B25YxCd7NWA";
-    const tokenID1 = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(uri1));
-    const tokenID2 = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(uri2));
+    const tokenID1 = await talentir.tokenUriToTokenID(uri1);
+    const tokenID2 = await talentir.tokenUriToTokenID(uri2);
     
     // Mint uri1 for account 1.
     await expect(talentir.mint(account1.address, uri1, ethers.constants.AddressZero))
@@ -94,8 +100,8 @@ describe("Talentir", function () {
   it("Transfer", async function () {
     const uri1 = "QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1"
     const uri2 = "QmPRRnZcj3PeWi8nDnM94KnbfsW5pscoY16B25YxCd7NWA";
-    const tokenID1 = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(uri1));
-    const tokenID2 = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(uri2));
+    const tokenID1 = await talentir.tokenUriToTokenID(uri1);
+    const tokenID2 = await talentir.tokenUriToTokenID(uri2);
     await talentir.mint(account1.address, uri1, ethers.constants.AddressZero);
     await talentir.mint(account2.address, uri2, ethers.constants.AddressZero);
 
