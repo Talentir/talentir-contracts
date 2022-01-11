@@ -6,8 +6,8 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./TalentirRoyalties.sol";
 
-/// @custom:security-contact jk@talentir.com
-contract Talentir is ERC721, ERC721URIStorage, AccessControl, TalentirRoyalties {
+/// @custom:security-contact security@talentir.com
+contract Talentir is ERC721URIStorage, AccessControl, TalentirRoyalties {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     constructor() ERC721("Talentir", "TAL") {
@@ -20,14 +20,6 @@ contract Talentir is ERC721, ERC721URIStorage, AccessControl, TalentirRoyalties 
     }
 
     address private _marketplaceAddress;
-
-    function tokenCidToTokenID(string memory cid) 
-        public
-        pure
-        returns (uint256) 
-    {
-        return uint256(keccak256(abi.encodePacked((cid))));
-    }
 
     function updateMarketplaceAddress(address newAddress) public onlyRole(DEFAULT_ADMIN_ROLE)
     {   
@@ -46,30 +38,22 @@ contract Talentir is ERC721, ERC721URIStorage, AccessControl, TalentirRoyalties 
         uint256 tokenId = tokenCidToTokenID(cid);
         _safeMint(to, tokenId);
         _setTokenURI(tokenId, cid);
-        _setRoyaltiyReceiver(royaltyReceiver, tokenId);
+        _setRoyaltyReceiver(tokenId, royaltyReceiver);
     }
 
     function isApprovedForAll(address owner, address operator) public view virtual override returns (bool) {
         return _marketplaceAddress == operator || super.isApprovedForAll(owner, operator);
     }
 
-    // The following functions are overrides required by Solidity.
-
-    function _burn(uint256 tokenId)
-        internal
-        override(ERC721, ERC721URIStorage)
-    {
-        super._burn(tokenId);
-    }
-
-    function tokenURI(uint256 tokenId)
+    function tokenCidToTokenID(string memory cid) 
         public
-        view
-        override(ERC721, ERC721URIStorage)
-        returns (string memory)
+        pure
+        returns (uint256) 
     {
-        return super.tokenURI(tokenId);
+        return uint256(keccak256(abi.encodePacked((cid))));
     }
+
+    // The following functions are overrides required by Solidity.
 
     function supportsInterface(bytes4 interfaceId)
         public

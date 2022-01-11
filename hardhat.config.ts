@@ -27,24 +27,34 @@ const config: HardhatUserConfig = {
     version: "0.8.4",
     settings: {
       optimizer: {
-        enabled: false,
+        enabled: true,
         runs: 200
       }
     }
   },
   networks: {
-    ropsten: {
-      url: process.env.ROPSTEN_URL || "",
+    rinkeby: {
+      url: process.env.RINKEBY_URL,
       accounts:
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
+    arbitrumTestnet: {
+      url: process.env.ARBITRUM_RINKEBY_URL,
+      accounts:
+        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    }
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,
-    currency: "USD",
+    currency: "EUR",
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY,
+    apiKey: {
+      mainnet: process.env.ETHERSCAN_API_KEY,
+      rinkeby: process.env.ETHERSCAN_API_KEY,
+      arbitrumOne: process.env.ARBISCAN_API_KEY,
+      arbitrumTestnet: process.env.ARBISCAN_API_KEY
+    }
   },
 };
 

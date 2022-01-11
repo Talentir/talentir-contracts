@@ -24,7 +24,7 @@ contract TalentirRoyalties is ERC165, IERC2981 {
     {
         address currentReceiver = _royaltyReceivers[tokenId];
         require(currentReceiver == msg.sender, "Only current royalty receiver can update.");
-        _royaltyReceivers[tokenId] = newRoyaltyReceiver;
+        _setRoyaltyReceiver(tokenId, newRoyaltyReceiver);
     }
 
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165, IERC165) returns (bool) {
@@ -33,7 +33,7 @@ contract TalentirRoyalties is ERC165, IERC2981 {
             super.supportsInterface(interfaceId);
     }
 
-    function _setRoyaltiyReceiver(address receiver, uint256 tokenID) 
+    function _setRoyaltyReceiver(uint256 tokenID, address receiver) 
         internal
     {
         _royaltyReceivers[tokenID] = receiver;
