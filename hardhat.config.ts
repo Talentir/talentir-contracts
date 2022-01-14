@@ -34,12 +34,12 @@ const config: HardhatUserConfig = {
   },
   networks: {
     rinkeby: {
-      url: process.env.RINKEBY_URL,
+      url: process.env.RINKEBY_URL ?? "",
       accounts:
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
     arbitrumTestnet: {
-      url: process.env.ARBITRUM_RINKEBY_URL,
+      url: process.env.ARBITRUM_RINKEBY_URL ?? "",
       accounts:
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     }
