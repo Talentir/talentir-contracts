@@ -15,6 +15,7 @@ contract TalentirRoyalties is ERC165, IERC2981 {
         override
         returns (address receiver, uint256 royaltyAmount)
     {
+        require(_royaltyReceivers[tokenId] != address(0), "No royalty info found for address.");
         receiver = _royaltyReceivers[tokenId];
         royaltyAmount = (value * ROYALTIES_PERCENTAGE) / 100;
     }
