@@ -52,6 +52,7 @@ async function main() {
   var jsonData = JSON.stringify({network: hre.network.name, address: talentir.address}, null, 2);
   fs.writeFileSync(currentDeploymentPath + "/data.json", jsonData);
 
+  // Execute typechain
   const abiJson = currentDeploymentPath + "/contracts/Talentir.sol/Talentir.json";
   const outDir = currentDeploymentPath + "/types";
   execSync("npx typechain --target=ethers-v5 " + abiJson + " --out-dir " + outDir);
