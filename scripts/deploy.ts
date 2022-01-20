@@ -5,6 +5,8 @@
 // Runtime Environment's members available in the global scope.
 import { ethers } from "hardhat";
 import * as hre from "hardhat";
+import * as fs from "fs";
+import * as path from "path";
 
 async function main() {
   // Hardhat always runs the compile task when running scripts with its command
@@ -13,7 +15,7 @@ async function main() {
   // If this script is run directly using `node` you may want to call compile
   // manually to make sure everything is compiled
   // await hre.run('compile');
-
+  
 
   // We get the contract to deploy
   const Talentir = await ethers.getContractFactory("Talentir");
@@ -23,10 +25,45 @@ async function main() {
 
   console.log("Talentir deployed to:", talentir.address);
 
-  const name = hre.network.name;
-  const address = talentir.address;
 
-  let map = {};
+  const projectRoot = hre.config.paths.root;
+  const artifactFolder = hre.config.paths.artifacts;
+  const network = hre.network.name;
+  const deploymentsPath = projectRoot + "/deployments";
+  const deploymentPath = deploymentsPath + "/" + network;
+  let index = 0;
+  while(fs.existsSync(deploymentPath + "/" + index)) {
+    index += 1;
+  }
+
+  const currentDeploymentPath = deploymentPath + "/" + index;
+  fs.mkdirSync(currentDeploymentPath, {recursive: true});
+
+  // Copy ABI Files
+  copyDir(artifactFolder + "/contracts", currentDeploymentPath + "/contracts");
+
+  interface Data {
+    network: string,
+    address: string
+  }
+
+  var jsonData = JSON.stringify({network: hre.network.name, address: talentir.address}, null, 2);
+
+  fs.writeFileSync(currentDeploymentPath + "/data.json", jsonData);
+}
+
+function copyDir(src: string, dest: string) {
+  fs.mkdirSync(dest, { recursive: true });
+  let entries = fs.readdirSync(src, { withFileTypes: true });
+
+  for (let entry of entries) {
+      let srcPath = path.join(src, entry.name);
+      let destPath = path.join(dest, entry.name);
+
+      entry.isDirectory() ?
+          copyDir(srcPath, destPath) :
+          fs.copyFileSync(srcPath, destPath);
+  }
 }
 
 // We recommend this pattern to be able to use async/await everywhere

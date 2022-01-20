@@ -1,8 +1,11 @@
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { expect } from "chai";
-import { ethers } from "hardhat";
-import { BytesLike } from "ethers";
-import { Talentir } from "../typechain"
+import {SignerWithAddress} from "@nomiclabs/hardhat-ethers/signers";
+import {expect} from "chai";
+import {ethers} from "hardhat";
+import {BytesLike} from "ethers";
+
+// Typechain
+import {Talentir, Talentir__factory} from "../artifacts/typechain"
+import * as hardhatExtensions from "../artifacts/typechain/hardhat"
 
 // Reference : https://ethereum-waffle.readthedocs.io/en/latest/matchers.html
 describe("Talentir", function () {

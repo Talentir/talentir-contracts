@@ -6,6 +6,9 @@ import "@nomiclabs/hardhat-waffle";
 import "@typechain/hardhat";
 import "hardhat-gas-reporter";
 import "solidity-coverage";
+import { artifacts } from "hardhat";
+import * as fs from "fs";
+import * as path from "path";
 
 dotenv.config();
 
@@ -17,6 +20,39 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
   for (const account of accounts) {
     console.log(account.address);
   }
+});
+
+task("typechain-deploy", "Exports all typechain definitions", async (taskArgs, hre) => {
+  const typechain = hre.config.typechain;
+  const cwd = process.cwd();
+
+  const { runTypeChain } = await import ("TypeChain");
+  
+  const deploymentsPath = hre.config.paths.root + "/deployments";
+  fs.readdirSync(deploymentsPath).forEach(network => {
+    let fullPath = path.join(deploymentsPath, network);
+    fs.readdirSync(fullPath).forEach(index => {
+      let deploymentPath = path.join(fullPath, index);
+      const contractsPath = path.join(deploymentPath, "contracts");
+      fs.readdirSync(contractsPath).forEach(contract => {
+        let contractPath = path.join(contractsPath, contract);
+        console.log(contractPath);
+        runTypeChain(    {
+          cwd: cwd, 
+          target: "ethers-v5",
+          filesToProcess: [contractPath],
+          outDir: "",
+          allFiles: [],
+        });
+      })
+      
+    })
+
+  })
+
+
+  
+  // npx typechain --target=ethers-v5 artifacts/contracts/Talentir.sol/Talentir.json --out-dir typetest
 });
 
 // You need to export an object to set up your config
@@ -47,6 +83,9 @@ const config: HardhatUserConfig = {
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,
     currency: "EUR",
+  },
+  typechain: {
+    outDir: "./artifacts/typechain"
   },
   etherscan: {
     apiKey: {
