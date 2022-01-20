@@ -7,6 +7,8 @@ import { ethers } from "hardhat";
 import * as hre from "hardhat";
 import * as fs from "fs";
 import * as path from "path";
+import "child_process"
+import { exec, execSync } from "child_process";
 
 async function main() {
   // Hardhat always runs the compile task when running scripts with its command
@@ -24,7 +26,6 @@ async function main() {
   await talentir.deployed();
 
   console.log("Talentir deployed to:", talentir.address);
-
 
   const projectRoot = hre.config.paths.root;
   const artifactFolder = hre.config.paths.artifacts;
@@ -47,9 +48,13 @@ async function main() {
     address: string
   }
 
+  // Create Datafile
   var jsonData = JSON.stringify({network: hre.network.name, address: talentir.address}, null, 2);
-
   fs.writeFileSync(currentDeploymentPath + "/data.json", jsonData);
+
+  const abiJson = currentDeploymentPath + "/contracts/Talentir.sol/Talentir.json";
+  const outDir = currentDeploymentPath + "/types";
+  execSync("npx typechain --target=ethers-v5 " + abiJson + " --out-dir " + outDir);
 }
 
 function copyDir(src: string, dest: string) {
