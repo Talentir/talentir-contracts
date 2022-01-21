@@ -7,8 +7,7 @@ import { ethers } from "hardhat";
 import * as hre from "hardhat";
 import * as fs from "fs";
 import * as path from "path";
-import "child_process"
-import { exec, execSync } from "child_process";
+import { execSync } from "child_process";
 
 async function main() {
   // Hardhat always runs the compile task when running scripts with its command
@@ -17,7 +16,6 @@ async function main() {
   // If this script is run directly using `node` you may want to call compile
   // manually to make sure everything is compiled
   // await hre.run('compile');
-  
 
   // We get the contract to deploy
   const Talentir = await ethers.getContractFactory("Talentir");
@@ -33,42 +31,44 @@ async function main() {
   const deploymentsPath = projectRoot + "/deployments";
   const deploymentPath = deploymentsPath + "/" + network;
   let index = 0;
-  while(fs.existsSync(deploymentPath + "/" + index)) {
+  while (fs.existsSync(deploymentPath + "/" + index)) {
     index += 1;
   }
 
   const currentDeploymentPath = deploymentPath + "/" + index;
-  fs.mkdirSync(currentDeploymentPath, {recursive: true});
+  fs.mkdirSync(currentDeploymentPath, { recursive: true });
 
   // Copy ABI Files
   copyDir(artifactFolder + "/contracts", currentDeploymentPath + "/contracts");
 
-  interface Data {
-    network: string,
-    address: string
-  }
-
   // Create Datafile
-  var jsonData = JSON.stringify({network: hre.network.name, address: talentir.address}, null, 2);
+  const jsonData = JSON.stringify(
+    { network: hre.network.name, address: talentir.address },
+    null,
+    2
+  );
   fs.writeFileSync(currentDeploymentPath + "/data.json", jsonData);
 
   // Execute typechain
-  const abiJson = currentDeploymentPath + "/contracts/Talentir.sol/Talentir.json";
+  const abiJson =
+    currentDeploymentPath + "/contracts/Talentir.sol/Talentir.json";
   const outDir = currentDeploymentPath + "/types";
-  execSync("npx typechain --target=ethers-v5 " + abiJson + " --out-dir " + outDir);
+  execSync(
+    "npx typechain --target=ethers-v5 " + abiJson + " --out-dir " + outDir
+  );
 }
 
 function copyDir(src: string, dest: string) {
   fs.mkdirSync(dest, { recursive: true });
-  let entries = fs.readdirSync(src, { withFileTypes: true });
+  const entries = fs.readdirSync(src, { withFileTypes: true });
 
-  for (let entry of entries) {
-      let srcPath = path.join(src, entry.name);
-      let destPath = path.join(dest, entry.name);
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
 
-      entry.isDirectory() ?
-          copyDir(srcPath, destPath) :
-          fs.copyFileSync(srcPath, destPath);
+    entry.isDirectory()
+      ? copyDir(srcPath, destPath)
+      : fs.copyFileSync(srcPath, destPath);
   }
 }
 

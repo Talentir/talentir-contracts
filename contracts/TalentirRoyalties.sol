@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 /// @custom:security-contact security@talentir.com
 contract TalentirRoyalties is ERC165, IERC2981 {
     mapping(uint256 => address) internal _royaltyReceivers;
-    uint256 constant internal ROYALTIES_PERCENTAGE = 10;
+    uint256 internal constant ROYALTIES_PERCENTAGE = 10;
 
     event UpdateRoyaltyReceiver(address from, address to, uint256 tokenID);
 
@@ -17,7 +17,7 @@ contract TalentirRoyalties is ERC165, IERC2981 {
         override
         returns (address receiver, uint256 royaltyAmount)
     {
-        require(_royaltyReceivers[tokenId] != address(0), "No royalty info found for address.");
+        require(_royaltyReceivers[tokenId] != address(0), "No royalty info for address");
         receiver = _royaltyReceivers[tokenId];
         royaltyAmount = (value * ROYALTIES_PERCENTAGE) / 100;
     }
@@ -26,19 +26,23 @@ contract TalentirRoyalties is ERC165, IERC2981 {
         public
     {
         address currentReceiver = _royaltyReceivers[tokenId];
-        require(currentReceiver == msg.sender, "Only current royalty receiver can update.");
+        require(currentReceiver == msg.sender, "Royalty receiver must update");
         _setRoyaltyReceiver(tokenId, newRoyaltyReceiver);
     }
 
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165, IERC165) returns (bool) {
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        virtual
+        override(ERC165, IERC165)
+        returns (bool)
+    {
         return
             interfaceId == type(IERC2981).interfaceId ||
             super.supportsInterface(interfaceId);
     }
 
-    function _setRoyaltyReceiver(uint256 tokenID, address receiver) 
-        internal
-    {
+    function _setRoyaltyReceiver(uint256 tokenID, address receiver) internal {
         address from = _royaltyReceivers[tokenID];
         _royaltyReceivers[tokenID] = receiver;
         emit UpdateRoyaltyReceiver(from, receiver, tokenID);
