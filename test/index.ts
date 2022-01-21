@@ -134,7 +134,9 @@ describe("Talentir", function () {
     const cid = "QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1"
     const tokenID1 = await talentir.tokenCidToTokenID(cid);
 
-    await talentir.mint(account1.address, cid, account2.address);
+    await expect(talentir.mint(account1.address, cid, account2.address))
+      .to.emit(talentir, "TransferRoyaltyOwernship")
+      .withArgs(ethers.constants.AddressZero, account2.address, tokenID1);
     const result = await talentir.royaltyInfo(tokenID1, 100);
     expect(result[0]).to.equal(account2.address);
     expect(result[1]).to.equal(10);
@@ -143,7 +145,10 @@ describe("Talentir", function () {
     await expect(talentir.connect(account1).updateRoyaltyReceiver(tokenID1, account3.address)).to.be.reverted;
 
     // Only the current royalty receiver can update update
-    await expect(talentir.connect(account2).updateRoyaltyReceiver(tokenID1, account3.address)).not.to.be.reverted;
+    await expect(talentir.connect(account2).updateRoyaltyReceiver(tokenID1, account3.address))
+      .to.emit(talentir, "TransferRoyaltyOwernship")
+      .withArgs(account2.address, account3.address, tokenID1)
+      .and.not.to.be.reverted;
   });
 
   it("Interface", async function () {

@@ -9,6 +9,8 @@ contract TalentirRoyalties is ERC165, IERC2981 {
     mapping(uint256 => address) internal _royaltyReceivers;
     uint256 constant internal ROYALTIES_PERCENTAGE = 10;
 
+    event UpdateRoyaltyReceiver(address from, address to, uint256 tokenID);
+
     function royaltyInfo(uint256 tokenId, uint256 value)
         external
         view
@@ -37,6 +39,8 @@ contract TalentirRoyalties is ERC165, IERC2981 {
     function _setRoyaltyReceiver(uint256 tokenID, address receiver) 
         internal
     {
+        address from = _royaltyReceivers[tokenID];
         _royaltyReceivers[tokenID] = receiver;
+        emit UpdateRoyaltyReceiver(from, receiver, tokenID);
     }
 }
