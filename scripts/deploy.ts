@@ -3,13 +3,13 @@
 //
 // When running the script with `npx hardhat run <script>` you'll find the Hardhat
 // Runtime Environment's members available in the global scope.
-import { ethers } from "hardhat";
-import * as hre from "hardhat";
-import * as fs from "fs";
-import * as path from "path";
-import { execSync } from "child_process";
+import { ethers } from 'hardhat'
+import * as hre from 'hardhat'
+import * as fs from 'fs'
+import * as path from 'path'
+import { execSync } from 'child_process'
 
-async function main() {
+async function main (): Promise<void> {
   // Hardhat always runs the compile task when running scripts with its command
   // line interface.
   //
@@ -18,63 +18,63 @@ async function main() {
   // await hre.run('compile');
 
   // We get the contract to deploy
-  const Talentir = await ethers.getContractFactory("Talentir");
-  const talentir = await Talentir.deploy();
+  const Talentir = await ethers.getContractFactory('Talentir')
+  const talentir = await Talentir.deploy()
 
-  await talentir.deployed();
+  await talentir.deployed()
 
-  console.log("Talentir deployed to:", talentir.address);
+  console.log('Talentir deployed to:', talentir.address)
 
-  const projectRoot = hre.config.paths.root;
-  const artifactFolder = hre.config.paths.artifacts;
-  const network = hre.network.name;
-  const deploymentsPath = projectRoot + "/deployments";
-  const deploymentPath = deploymentsPath + "/" + network;
-  let index = 0;
-  while (fs.existsSync(deploymentPath + "/" + index)) {
-    index += 1;
+  const projectRoot = hre.config.paths.root
+  const artifactFolder = hre.config.paths.artifacts
+  const network = hre.network.name
+  const deploymentsPath = projectRoot + '/deployments'
+  const deploymentPath = deploymentsPath + '/' + network
+  let index = 0
+  while (fs.existsSync(deploymentPath + '/' + index.toString())) {
+    index += 1
   }
 
-  const currentDeploymentPath = deploymentPath + "/" + index;
-  fs.mkdirSync(currentDeploymentPath, { recursive: true });
+  const currentDeploymentPath = deploymentPath + '/' + index.toString()
+  fs.mkdirSync(currentDeploymentPath, { recursive: true })
 
   // Copy ABI Files
-  copyDir(artifactFolder + "/contracts", currentDeploymentPath + "/contracts");
+  copyDir(artifactFolder + '/contracts', currentDeploymentPath + '/contracts')
 
   // Create Datafile
   const jsonData = JSON.stringify(
     { network: hre.network.name, address: talentir.address },
     null,
     2
-  );
-  fs.writeFileSync(currentDeploymentPath + "/data.json", jsonData);
+  )
+  fs.writeFileSync(currentDeploymentPath + '/data.json', jsonData)
 
   // Execute typechain
   const abiJson =
-    currentDeploymentPath + "/contracts/Talentir.sol/Talentir.json";
-  const outDir = currentDeploymentPath + "/types";
+    currentDeploymentPath + '/contracts/Talentir.sol/Talentir.json'
+  const outDir = currentDeploymentPath + '/types'
   execSync(
-    "npx typechain --target=ethers-v5 " + abiJson + " --out-dir " + outDir
-  );
+    'npx typechain --target=ethers-v5 ' + abiJson + ' --out-dir ' + outDir
+  )
 }
 
-function copyDir(src: string, dest: string) {
-  fs.mkdirSync(dest, { recursive: true });
-  const entries = fs.readdirSync(src, { withFileTypes: true });
+function copyDir (src: string, dest: string): void {
+  fs.mkdirSync(dest, { recursive: true })
+  const entries = fs.readdirSync(src, { withFileTypes: true })
 
   for (const entry of entries) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
+    const srcPath = path.join(src, entry.name)
+    const destPath = path.join(dest, entry.name)
 
     entry.isDirectory()
       ? copyDir(srcPath, destPath)
-      : fs.copyFileSync(srcPath, destPath);
+      : fs.copyFileSync(srcPath, destPath)
   }
 }
 
 // We recommend this pattern to be able to use async/await everywhere
 // and properly handle errors.
 main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+  console.error(error)
+  process.exitCode = 1
+})
