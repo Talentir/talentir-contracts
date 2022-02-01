@@ -4,7 +4,7 @@ import { ethers } from "hardhat";
 import { BytesLike } from "ethers";
 
 // eslint-disable-next-line
-import { Talentir } from "../typechain";
+import { Talentir, Talentir__factory } from "../typechain-types";
 
 // Reference : https://ethereum-waffle.readthedocs.io/en/latest/matchers.html
 describe("Talentir", function () {
@@ -15,7 +15,7 @@ describe("Talentir", function () {
   let talentir: Talentir;
 
   beforeEach(async function () {
-    const Talentir = await ethers.getContractFactory("Talentir");
+    const Talentir = await ethers.getContractFactory("Talentir") as Talentir__factory;
     talentir = await Talentir.deploy();
     await talentir.deployed();
 
