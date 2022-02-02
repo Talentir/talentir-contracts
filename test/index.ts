@@ -4,7 +4,7 @@ import { ethers } from 'hardhat'
 import { BytesLike } from 'ethers'
 
 // eslint-disable-next-line
-import { Talentir } from "../typechain-types";
+import { TalentirNFT } from "../typechain-types";
 
 // Reference : https://ethereum-waffle.readthedocs.io/en/latest/matchers.html
 describe('Talentir', function () {
@@ -12,10 +12,10 @@ describe('Talentir', function () {
   let account1: SignerWithAddress
   let account2: SignerWithAddress
   let account3: SignerWithAddress
-  let talentir: Talentir
+  let talentir: TalentirNFT
 
   beforeEach(async function () {
-    const Talentir = await ethers.getContractFactory('Talentir')
+    const Talentir = await ethers.getContractFactory('TalentirNFT')
     talentir = await Talentir.deploy()
     await talentir.deployed();
 
@@ -59,7 +59,7 @@ describe('Talentir', function () {
     const tokenIDRef = ethers.utils.keccak256(
       ethers.utils.toUtf8Bytes(tokenCID)
     )
-    const tokenID = (await talentir.tokenCidToTokenID(tokenCID)).toString()
+    const tokenID = (await talentir.contentIdToTokenId(tokenCID)).toString()
     expect(tokenID === tokenIDRef)
   })
 
@@ -89,8 +89,8 @@ describe('Talentir', function () {
   it('Minting', async function () {
     const uri1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
     const uri2 = 'QmPRRnZcj3PeWi8nDnM94KnbfsW5pscoY16B25YxCd7NWA'
-    const tokenID1 = await talentir.tokenCidToTokenID(uri1)
-    const tokenID2 = await talentir.tokenCidToTokenID(uri2)
+    const tokenID1 = await talentir.contentIdToTokenId(uri1)
+    const tokenID2 = await talentir.contentIdToTokenId(uri2)
 
     // Mint uri1 for account 1.
     await expect(
@@ -124,8 +124,8 @@ describe('Talentir', function () {
   it('Transfer', async function () {
     const uri1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
     const uri2 = 'QmPRRnZcj3PeWi8nDnM94KnbfsW5pscoY16B25YxCd7NWA'
-    const tokenID1 = await talentir.tokenCidToTokenID(uri1)
-    const tokenID2 = await talentir.tokenCidToTokenID(uri2)
+    const tokenID1 = await talentir.contentIdToTokenId(uri1)
+    const tokenID2 = await talentir.contentIdToTokenId(uri2)
     await talentir.mint(account1.address, uri1, ethers.constants.AddressZero)
     await talentir.mint(account2.address, uri2, ethers.constants.AddressZero)
 
@@ -165,7 +165,7 @@ describe('Talentir', function () {
 
   it('Royalties', async function () {
     const cid = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
-    const tokenID1 = await talentir.tokenCidToTokenID(cid)
+    const tokenID1 = await talentir.contentIdToTokenId(cid)
 
     await expect(talentir.mint(account1.address, cid, account2.address))
       .to.emit(talentir, 'UpdateRoyaltyReceiver')

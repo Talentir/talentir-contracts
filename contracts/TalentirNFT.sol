@@ -5,10 +5,10 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "./ERC721Royalty.sol";
+import "./utils/ERC721Royalty.sol";
 
 /// @custom:security-contact security@talentir.com
-contract Talentir is ERC721, ERC721URIStorage, ERC721Burnable, ERC721Royalty, AccessControl {
+contract TalentirNFT is ERC721, ERC721URIStorage, ERC721Burnable, ERC721Royalty, AccessControl {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     constructor() ERC721("Talentir", "TAL") {
@@ -43,7 +43,7 @@ contract Talentir is ERC721, ERC721URIStorage, ERC721Burnable, ERC721Royalty, Ac
         string memory cid,
         address royaltyReceiver
     ) public onlyRole(MINTER_ROLE) {
-        uint256 tokenId = tokenCidToTokenID(cid);
+        uint256 tokenId = contentIdToTokenId(cid);
         _safeMint(to, tokenId);
         _setTokenURI(tokenId, cid);
         _setRoyaltyReceiver(tokenId, royaltyReceiver);
@@ -61,7 +61,7 @@ contract Talentir is ERC721, ERC721URIStorage, ERC721Burnable, ERC721Royalty, Ac
             super.isApprovedForAll(owner, operator);
     }
 
-    function tokenCidToTokenID(string memory cid)
+    function contentIdToTokenId(string memory cid)
         public
         pure
         returns (uint256)

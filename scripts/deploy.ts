@@ -6,7 +6,6 @@
 import { ethers } from 'hardhat'
 import * as hre from 'hardhat'
 import * as fs from 'fs'
-import * as path from 'path'
 import { execSync } from 'child_process'
 
 async function main (): Promise<void> {
@@ -18,12 +17,12 @@ async function main (): Promise<void> {
   // await hre.run('compile');
 
   // We get the contract to deploy
-  const Talentir = await ethers.getContractFactory('Talentir')
-  const talentir = await Talentir.deploy()
+  const TalentirNFT = await ethers.getContractFactory('TalentirNFT')
+  const talentirNFT = await TalentirNFT.deploy()
 
-  await talentir.deployed()
+  await talentirNFT.deployed()
 
-  console.log('Talentir deployed to:', talentir.address)
+  console.log('Talentir deployed to:', talentirNFT.address)
 
   const projectRoot = hre.config.paths.root
   const artifactFolder = hre.config.paths.artifacts
@@ -38,38 +37,27 @@ async function main (): Promise<void> {
   const currentDeploymentPath = deploymentPath + '/' + index.toString()
   fs.mkdirSync(currentDeploymentPath, { recursive: true })
 
-  // Copy ABI Files
-  copyDir(artifactFolder + '/contracts', currentDeploymentPath + '/contracts')
+  fs.mkdirSync(currentDeploymentPath + '/contracts')
+  fs.copyFileSync(artifactFolder + '/contracts/TalentirNFT.sol/TalentirNFT.json',
+    currentDeploymentPath + '/contracts/TalentirNFT.json')
 
   // Create Datafile
-  const jsonData = JSON.stringify(
-    { network: hre.network.name, address: talentir.address },
-    null,
-    2
-  )
+  const jsonData = JSON.stringify({
+    TalentirNFT: {
+      network: hre.network.name,
+      address: talentirNFT.address,
+      blockNumber: talentirNFT.deployTransaction.blockNumber
+    }
+  }, null, 2)
   fs.writeFileSync(currentDeploymentPath + '/data.json', jsonData)
 
   // Execute typechain
   const abiJson =
-    currentDeploymentPath + '/contracts/Talentir.sol/Talentir.json'
+    currentDeploymentPath + '/contracts/TalentirNFT.json'
   const outDir = currentDeploymentPath + '/types'
   execSync(
     'npx typechain --target=ethers-v5 ' + abiJson + ' --out-dir ' + outDir
   )
-}
-
-function copyDir (src: string, dest: string): void {
-  fs.mkdirSync(dest, { recursive: true })
-  const entries = fs.readdirSync(src, { withFileTypes: true })
-
-  for (const entry of entries) {
-    const srcPath = path.join(src, entry.name)
-    const destPath = path.join(dest, entry.name)
-
-    entry.isDirectory()
-      ? copyDir(srcPath, destPath)
-      : fs.copyFileSync(srcPath, destPath)
-  }
 }
 
 // We recommend this pattern to be able to use async/await everywhere
