@@ -1,5 +1,12 @@
 {
   "name": "hardhat-project",
+  "scripts": {
+    "build": "npx hardhat compile",
+    "lint": "npx ts-standard",
+    "lintfix": "npx ts-standard --fix",
+    "test": "npx hardhat test",
+    "deploy": "npx hardhat run scripts/deploy.ts"
+  },
   "engines": {
     "node": ">=16.0.0"
   },
