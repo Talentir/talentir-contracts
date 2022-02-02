@@ -1,13 +1,13 @@
 //SPDX-License-Identifier: Unlicense
-pragma solidity ^0.8.2;
+pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 
 /// @custom:security-contact security@talentir.com
-contract TalentirRoyalties is ERC165, IERC2981 {
+contract ERC2981 is ERC165, IERC2981 {
     mapping(uint256 => address) internal _royaltyReceivers;
-    uint256 internal constant ROYALTIES_PERCENTAGE = 10;
+    uint16 internal _royaltyPercentage = 10;
 
     event UpdateRoyaltyReceiver(address from, address to, uint256 tokenID);
 
@@ -19,7 +19,7 @@ contract TalentirRoyalties is ERC165, IERC2981 {
     {
         require(_royaltyReceivers[tokenId] != address(0), "No royalty info for address");
         receiver = _royaltyReceivers[tokenId];
-        royaltyAmount = (value * ROYALTIES_PERCENTAGE) / 100;
+        royaltyAmount = (value * _royaltyPercentage) / 100;
     }
 
     function updateRoyaltyReceiver(uint256 tokenId, address newRoyaltyReceiver)
@@ -30,12 +30,7 @@ contract TalentirRoyalties is ERC165, IERC2981 {
         _setRoyaltyReceiver(tokenId, newRoyaltyReceiver);
     }
 
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        virtual
-        override(ERC165, IERC165)
-        returns (bool)
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165, IERC165) returns (bool)
     {
         return
             interfaceId == type(IERC2981).interfaceId ||

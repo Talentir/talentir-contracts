@@ -4,7 +4,7 @@ import { ethers } from 'hardhat'
 import { BytesLike } from 'ethers'
 
 // eslint-disable-next-line
-import { Talentir, Talentir__factory } from "../typechain-types";
+import { Talentir } from "../typechain-types";
 
 // Reference : https://ethereum-waffle.readthedocs.io/en/latest/matchers.html
 describe('Talentir', function () {
