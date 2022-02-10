@@ -43,11 +43,9 @@ async function main (): Promise<void> {
 
   // Create Datafile
   const jsonData = JSON.stringify({
-    TalentirNFT: {
-      network: hre.network.name,
-      address: talentirNFT.address,
-      blockNumber: talentirNFT.deployTransaction.blockNumber
-    }
+    network: hre.network.name,
+    address: talentirNFT.address,
+    blockNumber: talentirNFT.deployTransaction.blockNumber
   }, null, 2)
   fs.writeFileSync(currentDeploymentPath + '/data.json', jsonData)
 
