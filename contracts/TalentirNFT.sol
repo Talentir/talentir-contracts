@@ -26,7 +26,7 @@ contract TalentirNFT is ERC721, ERC721URIStorage, ERC721Burnable, ERC721Royalty,
 
     address private _marketplaceAddress;
 
-    function updateMarketplaceAddress(address newAddress) public onlyRole(DEFAULT_ADMIN_ROLE)
+    function setMarketplaceAddress(address newAddress) public onlyRole(DEFAULT_ADMIN_ROLE)
     {
         _marketplaceAddress = newAddress;
     }

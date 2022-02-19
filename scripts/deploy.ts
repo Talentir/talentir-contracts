@@ -22,10 +22,51 @@ async function main (): Promise<void> {
 
   await talentirNFT.deployed()
 
-  console.log('Talentir deployed to:', talentirNFT.address)
+  const TalentirMarketplace = await ethers.getContractFactory('TalentirMarketplace')
+  const talentirMarketplace = await TalentirMarketplace.deploy(talentirNFT.address)
+  talentirNFT.setMarketplaceAddress(talentirMarketplace.address)
 
+  console.log('TalentirNFT deployed to:', talentirNFT.address)
+  console.log('TalentirMarketplace deployed to:', talentirMarketplace.address)
+
+  // Save deployment
+  const currentDeploymentPath = deploymentPath()
+  
+  fs.mkdirSync(currentDeploymentPath + '/contracts', { recursive: true })
+
+  // Copy TalentirNFT ABI
+  const talentirNftAbi = hre.config.paths.artifacts + '/contracts/TalentirNFT.sol/TalentirNFT.json'
+  const talentirNftAbiDestination = currentDeploymentPath + '/contracts/TalentirNFT.json'
+  fs.copyFileSync(talentirNftAbi, talentirNftAbiDestination)
+
+  // Copy TalentirNFT ABI
+  const talentirMarketplaceAbi = hre.config.paths.artifacts + '/contracts/TalentirMarketplace.sol/TalentirMarketplace.json'
+  const talentirMarketplaceAbiDestination = currentDeploymentPath + '/contracts/TalentirMarketplace.json'
+  fs.copyFileSync(talentirMarketplaceAbi, talentirMarketplaceAbiDestination)
+
+  // Create Datafile which contains deployment info
+  const jsonData = JSON.stringify({
+    network: hre.network.name,
+    talentirNFT: {
+      address: talentirNFT.address,
+      blockNumber: talentirNFT.deployTransaction.blockNumber
+    },
+    talentirMarketplace: {
+      address: talentirMarketplace.address,
+      blockNumber: talentirMarketplace.deployTransaction.blockNumber
+    }
+  }, null, 2)
+  fs.writeFileSync(currentDeploymentPath + '/data.json', jsonData)
+
+  // Execute typechain
+  const outDir = currentDeploymentPath + '/types'
+  execSync(
+    'npx typechain --target=ethers-v5 ' + talentirNftAbi + ' ' + talentirMarketplaceAbi + ' --out-dir ' + outDir
+  )
+}
+
+function deploymentPath (): string {
   const projectRoot = hre.config.paths.root
-  const artifactFolder = hre.config.paths.artifacts
   const network = hre.network.name
   const deploymentsPath = projectRoot + '/deployments'
   const deploymentPath = deploymentsPath + '/' + network
@@ -33,29 +74,7 @@ async function main (): Promise<void> {
   while (fs.existsSync(deploymentPath + '/' + index.toString())) {
     index += 1
   }
-
-  const currentDeploymentPath = deploymentPath + '/' + index.toString()
-  fs.mkdirSync(currentDeploymentPath, { recursive: true })
-
-  fs.mkdirSync(currentDeploymentPath + '/contracts')
-  fs.copyFileSync(artifactFolder + '/contracts/TalentirNFT.sol/TalentirNFT.json',
-    currentDeploymentPath + '/contracts/TalentirNFT.json')
-
-  // Create Datafile
-  const jsonData = JSON.stringify({
-    network: hre.network.name,
-    address: talentirNFT.address,
-    blockNumber: talentirNFT.deployTransaction.blockNumber
-  }, null, 2)
-  fs.writeFileSync(currentDeploymentPath + '/data.json', jsonData)
-
-  // Execute typechain
-  const abiJson =
-    currentDeploymentPath + '/contracts/TalentirNFT.json'
-  const outDir = currentDeploymentPath + '/types'
-  execSync(
-    'npx typechain --target=ethers-v5 ' + abiJson + ' --out-dir ' + outDir
-  )
+  return deploymentPath + '/' + index.toString()
 }
 
 // We recommend this pattern to be able to use async/await everywhere

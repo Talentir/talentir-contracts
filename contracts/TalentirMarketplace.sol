@@ -5,8 +5,9 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 import "@openzeppelin/contracts/interfaces/IERC721.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract Marketplace is Ownable {
+contract TalentirMarketplace is Ownable, ReentrancyGuard {
     struct SellOffer {
         address seller;
         uint256 minPrice;
@@ -14,24 +15,19 @@ contract Marketplace is Ownable {
 
     struct BuyOffer {
         address buyer;
-        uint256 price;
-        uint256 createTime;
+        uint256 price; // This amount will be held in escrow
     }
 
     constructor(address talentirNftAddress) {
-        setNftContract(talentirNftAddress);
+        nftAddress = talentirNftAddress;
     }
 
     function setNftContract(address talentirNftAddress) public onlyOwner {
         nftAddress = talentirNftAddress;
-        nftContract = IERC721(talentirNftAddress);
-        royaltyContract = IERC2981(talentirNftAddress);
     }
 
     // TalentirNFT Contract
     address public nftAddress = address(0);
-    IERC721 internal nftContract;
-    IERC2981 internal royaltyContract;
 
     // Active Offers
     mapping(uint256 => SellOffer) public activeSellOffers;
@@ -45,7 +41,7 @@ contract Marketplace is Ownable {
     event NewBuyOffer(uint256 tokenId, address buyer, uint256 value);
     event SellOfferWithdrawn(uint256 tokenId, address seller);
     event BuyOfferWithdrawn(uint256 tokenId, address buyer);
-    event RoyaltiesPaid(uint256 tokenId, uint value);
+    event RoyaltiesPaid(uint256 tokenId, uint value, address receiver);
     event Sale(uint256 tokenId, address seller, address buyer, uint256 value);
 
     function makeSellOffer(uint256 tokenId, uint256 minPrice) external 
@@ -71,23 +67,10 @@ contract Marketplace is Ownable {
         emit SellOfferWithdrawn(tokenId, msg.sender);
     }
 
-
     function purchase(uint256 tokenId) external tokenOwnerForbidden(tokenId) payable {
         address seller = activeSellOffers[tokenId].seller;
 
         require(seller != address(0), "No active sell offer");
-
-        // If, for some reason, the token is not approved anymore (transfer or
-        // sale on another market place for instance), we remove the sell order
-        // and throw
-        if (nftContract.getApproved(tokenId) != address(this)) {
-            delete (activeSellOffers[tokenId]);
-            // Broadcast offer withdrawal
-            emit SellOfferWithdrawn(tokenId, seller);
-            // Revert
-            revert("Invalid sell offer");
-        }
-
         require(msg.value >= activeSellOffers[tokenId].minPrice, "Amount sent too low");
 
         uint256 saleValue = _deduceRoyalties(tokenId, msg.value);
@@ -96,11 +79,11 @@ contract Marketplace is Ownable {
         _sendFunds(activeSellOffers[tokenId].seller, saleValue);
 
         // And token to the buyer
-        nftContract.safeTransferFrom(seller, msg.sender, tokenId);
+        IERC721(nftAddress).safeTransferFrom(seller, msg.sender, tokenId);
 
         // Remove all sell and buy offers
         delete (activeSellOffers[tokenId]);
-        delete (activeBuyOffers[tokenId]);
+        _removeBuyOffer(tokenId);
 
         // Broadcast the sale
         emit Sale(tokenId, seller, msg.sender, msg.value);
@@ -119,52 +102,50 @@ contract Marketplace is Ownable {
              "Sell order at this price or lower exists");
         }
         
-        // Only process the offer if it is higher than the previous one or the
-        // previous one has expired
-        require(activeBuyOffers[tokenId].createTime <
-                (block.timestamp - 1 days) || msg.value >
-                activeBuyOffers[tokenId].price,
-                "Previous buy offer higher or not expired");
-        address previousBuyOfferOwner = activeBuyOffers[tokenId].buyer;
-        uint256 refundBuyOfferAmount = buyOffersEscrow[previousBuyOfferOwner][tokenId];
-
-        // Refund the owner of the previous buy offer
-        buyOffersEscrow[previousBuyOfferOwner][tokenId] = 0;
-        if (refundBuyOfferAmount > 0) {
-            _sendFunds(previousBuyOfferOwner, refundBuyOfferAmount);
-        }
+        // Only process the offer if it is higher than the previous one
+        require(msg.value > activeBuyOffers[tokenId].price, "Existing buy offer higher");
+  
+        _removeBuyOffer(tokenId);
 
         // Create a new buy offer
-        activeBuyOffers[tokenId] = BuyOffer({buyer : msg.sender,
-                                             price : msg.value,
-                                             createTime : block.timestamp});
+        activeBuyOffers[tokenId] = BuyOffer({buyer : msg.sender, price : msg.value});
+
         // Create record of funds deposited for this offer
         buyOffersEscrow[msg.sender][tokenId] = msg.value;
+
         // Broadcast the buy offer
         emit NewBuyOffer(tokenId, msg.sender, msg.value);
     }
 
-    /// @notice Withdraws a buy offer. Can only be withdrawn a day after being
-    ///         posted
+    /// @notice Withdraws a buy offer.
     /// @param tokenId - id of the token whose buy order to remove
-    function withdrawBuyOffer(uint256 tokenId) external lastBuyOfferExpired(tokenId) {
+    function withdrawBuyOffer(uint256 tokenId) external {
         require(activeBuyOffers[tokenId].buyer == msg.sender, "Not buyer");
 
-        uint256 refundBuyOfferAmount = buyOffersEscrow[msg.sender][tokenId];
+        _removeBuyOffer(tokenId);
 
-        // Set the buyer balance to 0 before refund
-        buyOffersEscrow[msg.sender][tokenId] = 0;
+        // Broadcast offer withdrawal
+        emit BuyOfferWithdrawn(tokenId, msg.sender);
+    }
+
+    function _removeBuyOffer(uint256 tokenId) private {
+        address previousBuyOfferOwner = activeBuyOffers[tokenId].buyer;
+
+        if (previousBuyOfferOwner == address(0)) {
+            return;
+        }
+
+        uint256 refundBuyOfferAmount = buyOffersEscrow[previousBuyOfferOwner][tokenId];
+
+        // Refund the owner of the previous buy offer
+        buyOffersEscrow[previousBuyOfferOwner][tokenId] = 0;
+
+        if (refundBuyOfferAmount > 0) {
+            _sendFunds(previousBuyOfferOwner, refundBuyOfferAmount);
+        }
 
         // Remove the current buy offer
         delete(activeBuyOffers[tokenId]);
-
-        // Refund the current buy offer if it is non-zero
-        if (refundBuyOfferAmount > 0) {
-            _sendFunds(msg.sender, refundBuyOfferAmount);
-        }
-        
-        // Broadcast offer withdrawal
-        emit BuyOfferWithdrawn(tokenId, msg.sender);
     }
 
     /// @notice Lets a token owner accept the current buy offer
@@ -190,22 +171,21 @@ contract Marketplace is Ownable {
         _sendFunds(msg.sender, netSaleValue);
 
         // And token to the buyer
-        nftContract.safeTransferFrom(
-            msg.sender,
-            currentBuyer,
-            tokenId
-        );
+        IERC721(nftAddress).safeTransferFrom(msg.sender, currentBuyer, tokenId);
 
         // Broadcast the sale
         emit Sale(tokenId, msg.sender, currentBuyer, saleValue);
     }
+
+    // TODO: Function for cleaning up Sell & Buy Offers when owner has changed
+
 
     /// @notice Transfers royalties to the rightsowner if applicable
     function _deduceRoyalties(uint256 tokenId, uint256 grossSaleValue) internal returns (uint256 netSaleAmount) {
         if (_checkRoyalties(nftAddress)) {
             // Get amount of royalties to pays and recipient
             (address royaltiesReceiver, uint256 royaltiesAmount) 
-                = royaltyContract.royaltyInfo(tokenId, grossSaleValue);
+                = IERC2981(nftAddress).royaltyInfo(tokenId, grossSaleValue);
 
             // Deduce royalties from sale value
             uint256 netSaleValue = grossSaleValue - royaltiesAmount;
@@ -216,14 +196,14 @@ contract Marketplace is Ownable {
             }
 
             // Broadcast royalties payment
-            emit RoyaltiesPaid(tokenId, royaltiesAmount);
+            emit RoyaltiesPaid(tokenId, royaltiesAmount, royaltiesReceiver);
             return netSaleValue;
         } else {
             return grossSaleValue;
         }
     }
 
-    function _sendFunds(address receiver, uint256 amount) internal {
+    function _sendFunds(address receiver, uint256 amount) private nonReentrant {
         (bool success,) =  receiver.call{value: amount}("");
         require(success == true, "Couldn't send funds");
     }
@@ -234,22 +214,25 @@ contract Marketplace is Ownable {
     }
 
     modifier isMarketable(uint256 tokenId) {
-        require(nftContract.getApproved(tokenId) == address(this), "Not approved");
+        require(_isMarketable(tokenId), "Not approved");
         _;
     }
 
+    function _isMarketable(uint256 tokenId) private view returns (bool) {
+        IERC721 nft = IERC721(nftAddress);
+        address owner = nft.ownerOf(tokenId);
+        bool approved = nft.getApproved(tokenId) == address(this);
+        bool approvedForAll = nft.isApprovedForAll(owner, address(this));
+        return approved || approvedForAll;
+    }
+
     modifier tokenOwnerForbidden(uint256 tokenId) {
-        require(nftContract.ownerOf(tokenId) != msg.sender, "Token owner not allowed");
+        require(IERC721(nftAddress).ownerOf(tokenId) != msg.sender, "Token owner not allowed");
         _;
     }
 
     modifier tokenOwnerOnly(uint256 tokenId) {
-        require(nftContract.ownerOf(tokenId) == msg.sender, "Not token owner");
-        _;
-    }
-
-    modifier lastBuyOfferExpired(uint256 tokenId) {
-        require(activeBuyOffers[tokenId].createTime < (block.timestamp - 1 days), "Buy offer not expired");
+        require(IERC721(nftAddress).ownerOf(tokenId) == msg.sender, "Not token owner");
         _;
     }
 }
