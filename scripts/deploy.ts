@@ -32,17 +32,7 @@ async function main (): Promise<void> {
   // Save deployment
   const currentDeploymentPath = deploymentPath()
   
-  fs.mkdirSync(currentDeploymentPath + '/contracts', { recursive: true })
-
-  // Copy TalentirNFT ABI
-  const talentirNftAbi = hre.config.paths.artifacts + '/contracts/TalentirNFT.sol/TalentirNFT.json'
-  const talentirNftAbiDestination = currentDeploymentPath + '/contracts/TalentirNFT.json'
-  fs.copyFileSync(talentirNftAbi, talentirNftAbiDestination)
-
-  // Copy TalentirNFT ABI
-  const talentirMarketplaceAbi = hre.config.paths.artifacts + '/contracts/TalentirMarketplace.sol/TalentirMarketplace.json'
-  const talentirMarketplaceAbiDestination = currentDeploymentPath + '/contracts/TalentirMarketplace.json'
-  fs.copyFileSync(talentirMarketplaceAbi, talentirMarketplaceAbiDestination)
+  fs.mkdirSync(currentDeploymentPath, { recursive: true })
 
   // Create Datafile which contains deployment info
   const jsonData = JSON.stringify({
@@ -57,6 +47,10 @@ async function main (): Promise<void> {
     }
   }, null, 2)
   fs.writeFileSync(currentDeploymentPath + '/data.json', jsonData)
+
+  const contractsFolder = hre.config.paths.artifacts + '/contracts'
+  const talentirNftAbi = contractsFolder + '/TalentirNFT.sol/TalentirNFT.json'
+  const talentirMarketplaceAbi = contractsFolder + '/TalentirMarketplace.sol/TalentirMarketplace.json'
 
   // Execute typechain
   const outDir = currentDeploymentPath + '/types'

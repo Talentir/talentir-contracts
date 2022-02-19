@@ -34,9 +34,9 @@ describe('TalentirMarketplace', function () {
       return await talentirNFT.contentIdToTokenId(value)
     }))
 
-    await talentirNFT.mint(luki.address, nftContentIds[0], johnny.address)
-    await talentirNFT.mint(dave.address, nftContentIds[1], luki.address)
-    await talentirNFT.mint(johnny.address, nftContentIds[2], luki.address)
+    await talentirNFT.mint(luki.address, '', nftContentIds[0], johnny.address)
+    await talentirNFT.mint(dave.address, '', nftContentIds[1], luki.address)
+    await talentirNFT.mint(johnny.address, '', nftContentIds[2], luki.address)
   })
 
   it('Check owner is admin', async function () {

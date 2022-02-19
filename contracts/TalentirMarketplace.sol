@@ -32,7 +32,7 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard {
     // Active Offers
     mapping(uint256 => SellOffer) public activeSellOffers;
     mapping(uint256 => BuyOffer) public activeBuyOffers;
-    
+
     // Escrow for buy offers
     mapping(address => mapping(uint256 => uint256)) public buyOffersEscrow;
 
@@ -41,22 +41,17 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard {
     event NewBuyOffer(uint256 tokenId, address buyer, uint256 value);
     event SellOfferWithdrawn(uint256 tokenId, address seller);
     event BuyOfferWithdrawn(uint256 tokenId, address buyer);
-    event RoyaltiesPaid(uint256 tokenId, uint value, address receiver);
+    event RoyaltiesPaid(uint256 tokenId, uint256 value, address receiver);
     event Sale(uint256 tokenId, address seller, address buyer, uint256 value);
 
-    function makeSellOffer(uint256 tokenId, uint256 minPrice) external 
-        isMarketable(tokenId) 
-        tokenOwnerOnly(tokenId)
-    {
+    function makeSellOffer(uint256 tokenId, uint256 minPrice) external isMarketable(tokenId) tokenOwnerOnly(tokenId) {
         // Create sell offer
-        activeSellOffers[tokenId] = SellOffer({seller : msg.sender,
-                                               minPrice : minPrice});
+        activeSellOffers[tokenId] = SellOffer({seller: msg.sender, minPrice: minPrice});
         // Broadcast sell offer
         emit NewSellOffer(tokenId, msg.sender, minPrice);
     }
 
-    function withdrawSellOffer(uint256 tokenId) external isMarketable(tokenId)
-    {
+    function withdrawSellOffer(uint256 tokenId) external isMarketable(tokenId) {
         require(activeSellOffers[tokenId].seller != address(0), "No sale offer");
         require(activeSellOffers[tokenId].seller == msg.sender, "Not seller");
 
@@ -67,7 +62,7 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard {
         emit SellOfferWithdrawn(tokenId, msg.sender);
     }
 
-    function purchase(uint256 tokenId) external tokenOwnerForbidden(tokenId) payable {
+    function purchase(uint256 tokenId) external payable tokenOwnerForbidden(tokenId) {
         address seller = activeSellOffers[tokenId].seller;
 
         require(seller != address(0), "No active sell offer");
@@ -94,21 +89,20 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard {
     ///         replaced for 24 hours. Amount of the offer is put in escrow
     ///         until the offer is withdrawn or superceded
     /// @param tokenId - id of the token to buy
-    function makeBuyOffer(uint256 tokenId) external tokenOwnerForbidden(tokenId) payable {
+    function makeBuyOffer(uint256 tokenId) external payable tokenOwnerForbidden(tokenId) {
         // Reject the offer if item is already available for purchase at a
         // lower or identical price
         if (activeSellOffers[tokenId].minPrice != 0) {
-            require((msg.value > activeSellOffers[tokenId].minPrice), 
-             "Sell order at this price or lower exists");
+            require((msg.value > activeSellOffers[tokenId].minPrice), "Sell order at this price or lower exists");
         }
-        
+
         // Only process the offer if it is higher than the previous one
         require(msg.value > activeBuyOffers[tokenId].price, "Existing buy offer higher");
-  
+
         _removeBuyOffer(tokenId);
 
         // Create a new buy offer
-        activeBuyOffers[tokenId] = BuyOffer({buyer : msg.sender, price : msg.value});
+        activeBuyOffers[tokenId] = BuyOffer({buyer: msg.sender, price: msg.value});
 
         // Create record of funds deposited for this offer
         buyOffersEscrow[msg.sender][tokenId] = msg.value;
@@ -145,7 +139,7 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard {
         }
 
         // Remove the current buy offer
-        delete(activeBuyOffers[tokenId]);
+        delete (activeBuyOffers[tokenId]);
     }
 
     /// @notice Lets a token owner accept the current buy offer
@@ -179,13 +173,14 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard {
 
     // TODO: Function for cleaning up Sell & Buy Offers when owner has changed
 
-
     /// @notice Transfers royalties to the rightsowner if applicable
     function _deduceRoyalties(uint256 tokenId, uint256 grossSaleValue) internal returns (uint256 netSaleAmount) {
         if (_checkRoyalties(nftAddress)) {
             // Get amount of royalties to pays and recipient
-            (address royaltiesReceiver, uint256 royaltiesAmount) 
-                = IERC2981(nftAddress).royaltyInfo(tokenId, grossSaleValue);
+            (address royaltiesReceiver, uint256 royaltiesAmount) = IERC2981(nftAddress).royaltyInfo(
+                tokenId,
+                grossSaleValue
+            );
 
             // Deduce royalties from sale value
             uint256 netSaleValue = grossSaleValue - royaltiesAmount;
@@ -204,13 +199,13 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard {
     }
 
     function _sendFunds(address receiver, uint256 amount) private nonReentrant {
-        (bool success,) =  receiver.call{value: amount}("");
+        (bool success, ) = receiver.call{value: amount}("");
         require(success == true, "Couldn't send funds");
     }
 
     function _checkRoyalties(address _contract) internal view returns (bool) {
         bytes4 interfaceIdErc2981 = 0x2a55205a;
-        return  IERC2981(_contract).supportsInterface(interfaceIdErc2981);
+        return IERC2981(_contract).supportsInterface(interfaceIdErc2981);
     }
 
     modifier isMarketable(uint256 tokenId) {

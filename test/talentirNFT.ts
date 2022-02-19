@@ -27,11 +27,11 @@ describe('TalentirNFT', function () {
     const adminRole = await talentir.DEFAULT_ADMIN_ROLE()
 
     await expect(talentir.connect(account1)
-      .mint(account1.address, 'abcd', ethers.constants.AddressZero)).to.be.reverted
+      .mint(account1.address, '', 'abcd', ethers.constants.AddressZero)).to.be.reverted
 
     await talentir.grantRole(minterRole, account1.address)
 
-    await expect(talentir.connect(account1).mint(account1.address, 'abcd', ethers.constants.AddressZero))
+    await expect(talentir.connect(account1).mint(account1.address, '', 'abcd', ethers.constants.AddressZero))
       .to.not.be.reverted
 
     // Minter
@@ -54,10 +54,10 @@ describe('TalentirNFT', function () {
   })
 
   it('Marketplace address', async function () {
-    const cid = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
-    const tokenID1 = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(cid))
+    const contentID = 'ABCD1234'
+    const tokenID1 = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(contentID))
 
-    await talentir.mint(account1.address, cid, ethers.constants.AddressZero)
+    await talentir.mint(account1.address, '', contentID, ethers.constants.AddressZero)
 
     await expect(talentir.connect(account3).transferFrom(account1.address, account2.address, tokenID1))
       .to.be.reverted
@@ -71,42 +71,47 @@ describe('TalentirNFT', function () {
   })
 
   it('Minting', async function () {
-    const uri1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
-    const uri2 = 'QmPRRnZcj3PeWi8nDnM94KnbfsW5pscoY16B25YxCd7NWA'
-    const tokenID1 = await talentir.contentIdToTokenId(uri1)
-    const tokenID2 = await talentir.contentIdToTokenId(uri2)
+    const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
+    const cid2 = 'QmPRRnZcj3PeWi8nDnM94KnbfsW5pscoY16B25YxCd7NWA'
+    const contentID1 = '1'
+    const contentID2 = '2'
+    const tokenID1 = await talentir.contentIdToTokenId(contentID1)
+    const tokenID2 = await talentir.contentIdToTokenId(contentID2)
 
     // Mint uri1 for account 1.
-    await expect(talentir.mint(account1.address, uri1, ethers.constants.AddressZero))
+    await expect(talentir.mint(account1.address, cid1, contentID1, ethers.constants.AddressZero))
       .to.emit(talentir, 'Transfer')
       .withArgs(ethers.constants.AddressZero, account1.address, tokenID1)
       .to.not.emit(talentir, 'Approval')
 
     // Check if tokens exist and URI is correct.
-    expect(await talentir.tokenURI(tokenID1)).to.equal('ipfs://' + uri1)
+    expect(await talentir.tokenURI(tokenID1)).to.equal('ipfs://' + cid1)
     await expect(talentir.tokenURI(tokenID2)).to.be.reverted
 
-    // Try minting same token again. It should revert.
-    await expect(talentir.mint(account2.address, uri1, ethers.constants.AddressZero))
+    // Try minting same contentID again. It should revert.
+    await expect(talentir.mint(account2.address, cid2, contentID1, ethers.constants.AddressZero))
       .to.be.revertedWith('ERC721: token already minted')
 
-    // Mint uri2 for account 2.
-    await expect(talentir.mint(account2.address, uri2, ethers.constants.AddressZero))
+    // Mint for account 2.
+    await expect(talentir.mint(account2.address, cid2, contentID2, ethers.constants.AddressZero))
       .to.emit(talentir, 'Transfer')
       .withArgs(ethers.constants.AddressZero, account2.address, tokenID2)
 
-    // Check if tokens exist and URI is correct.
-    expect(await talentir.tokenURI(tokenID1)).to.equal('ipfs://' + uri1)
-    expect(await talentir.tokenURI(tokenID2)).to.equal('ipfs://' + uri2)
+    // // Check if tokens exist and URI is correct.
+    expect(await talentir.tokenURI(tokenID1)).to.equal('ipfs://' + cid1)
+    expect(await talentir.tokenURI(tokenID2)).to.equal('ipfs://' + cid2)
   })
 
   it('Transfer', async function () {
-    const uri1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
-    const uri2 = 'QmPRRnZcj3PeWi8nDnM94KnbfsW5pscoY16B25YxCd7NWA'
-    const tokenID1 = await talentir.contentIdToTokenId(uri1)
-    const tokenID2 = await talentir.contentIdToTokenId(uri2)
-    await talentir.mint(account1.address, uri1, ethers.constants.AddressZero)
-    await talentir.mint(account2.address, uri2, ethers.constants.AddressZero)
+    const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
+    const cid2 = 'QmPRRnZcj3PeWi8nDnM94KnbfsW5pscoY16B25YxCd7NWA'
+    const contentID1 = '1'
+    const contentID2 = '2'
+    const tokenID1 = await talentir.contentIdToTokenId(contentID1)
+    const tokenID2 = await talentir.contentIdToTokenId(contentID2)
+
+    await talentir.mint(account1.address, cid1, contentID1, ethers.constants.AddressZero)
+    await talentir.mint(account2.address, cid2, contentID2, ethers.constants.AddressZero)
 
     // Admin shouldn't be allowed to transfer NFTs.
     await expect(talentir.transferFrom(account2.address, account1.address, tokenID2))
@@ -130,10 +135,10 @@ describe('TalentirNFT', function () {
   })
 
   it('Royalties', async function () {
-    const cid = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
-    const tokenID1 = await talentir.contentIdToTokenId(cid)
+    const contentID = 'contentID'
+    const tokenID1 = await talentir.contentIdToTokenId(contentID)
 
-    await expect(talentir.mint(account1.address, cid, account2.address))
+    await expect(talentir.mint(account1.address, '', contentID, account2.address))
       .to.emit(talentir, 'UpdateRoyaltyReceiver')
       .withArgs(ethers.constants.AddressZero, account2.address, tokenID1)
     const result = await talentir.royaltyInfo(tokenID1, 100)

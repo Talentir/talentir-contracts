@@ -22,19 +22,14 @@ contract ERC2981 is ERC165, IERC2981 {
         royaltyAmount = (value * _royaltyPercentage) / 100;
     }
 
-    function updateRoyaltyReceiver(uint256 tokenId, address newRoyaltyReceiver)
-        public
-    {
+    function updateRoyaltyReceiver(uint256 tokenId, address newRoyaltyReceiver) public {
         address currentReceiver = _royaltyReceivers[tokenId];
         require(currentReceiver == msg.sender, "Royalty receiver must update");
         _setRoyaltyReceiver(tokenId, newRoyaltyReceiver);
     }
 
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165, IERC165) returns (bool)
-    {
-        return
-            interfaceId == type(IERC2981).interfaceId ||
-            super.supportsInterface(interfaceId);
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165, IERC165) returns (bool) {
+        return interfaceId == type(IERC2981).interfaceId || super.supportsInterface(interfaceId);
     }
 
     function _setRoyaltyReceiver(uint256 tokenID, address receiver) internal {
