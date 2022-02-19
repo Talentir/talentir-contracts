@@ -19,11 +19,12 @@ async function main (): Promise<void> {
   // We get the contract to deploy
   const TalentirNFT = await ethers.getContractFactory('TalentirNFT')
   const talentirNFT = await TalentirNFT.deploy()
-
-  await talentirNFT.deployed()
+  const talentirNFTReceipt = await talentirNFT.deployTransaction.wait()
 
   const TalentirMarketplace = await ethers.getContractFactory('TalentirMarketplace')
   const talentirMarketplace = await TalentirMarketplace.deploy(talentirNFT.address)
+  const talentirMarketplaceReceipt = await talentirMarketplace.deployTransaction.wait()
+
   talentirNFT.setMarketplaceAddress(talentirMarketplace.address)
 
   console.log('TalentirNFT deployed to:', talentirNFT.address)
@@ -39,11 +40,11 @@ async function main (): Promise<void> {
     network: hre.network.name,
     talentirNFT: {
       address: talentirNFT.address,
-      blockNumber: talentirNFT.deployTransaction.blockNumber
+      blockNumber: talentirNFTReceipt.blockNumber
     },
     talentirMarketplace: {
       address: talentirMarketplace.address,
-      blockNumber: talentirMarketplace.deployTransaction.blockNumber
+      blockNumber: talentirMarketplaceReceipt.blockNumber
     }
   }, null, 2)
   fs.writeFileSync(currentDeploymentPath + '/data.json', jsonData)
