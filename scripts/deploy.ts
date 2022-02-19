@@ -31,7 +31,7 @@ async function main (): Promise<void> {
 
   // Save deployment
   const currentDeploymentPath = deploymentPath()
-  
+
   fs.mkdirSync(currentDeploymentPath, { recursive: true })
 
   // Create Datafile which contains deployment info
