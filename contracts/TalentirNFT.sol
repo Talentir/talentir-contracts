@@ -24,10 +24,10 @@ contract TalentirNFT is ERC721, ERC721URIStorage, ERC721Burnable, ERC721Royalty,
         _royaltyPercentage = percentage;
     }
 
-    address private _marketplaceAddress;
+    address public marketplaceAddress;
 
     function setMarketplaceAddress(address newAddress) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        _marketplaceAddress = newAddress;
+        marketplaceAddress = newAddress;
     }
 
     /**
