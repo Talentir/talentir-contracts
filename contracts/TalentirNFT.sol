@@ -48,7 +48,7 @@ contract TalentirNFT is ERC721, ERC721URIStorage, ERC721Burnable, ERC721Royalty,
     }
 
     function isApprovedForAll(address owner, address operator) public view virtual override returns (bool) {
-        return marketplaceAddres == operator || super.isApprovedForAll(owner, operator);
+        return marketplaceAddress == operator || super.isApprovedForAll(owner, operator);
     }
 
     /** 

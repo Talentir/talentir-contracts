@@ -20,15 +20,14 @@ async function main (): Promise<void> {
   const TalentirNFT = await ethers.getContractFactory('TalentirNFT')
   const talentirNFT = await TalentirNFT.deploy()
   const talentirNFTReceipt = await talentirNFT.deployTransaction.wait()
+  console.log('TalentirNFT deployed to:', talentirNFT.address)
 
   const TalentirMarketplace = await ethers.getContractFactory('TalentirMarketplace')
   const talentirMarketplace = await TalentirMarketplace.deploy(talentirNFT.address)
   const talentirMarketplaceReceipt = await talentirMarketplace.deployTransaction.wait()
-
-  talentirNFT.setMarketplaceAddress(talentirMarketplace.address)
-
-  console.log('TalentirNFT deployed to:', talentirNFT.address)
   console.log('TalentirMarketplace deployed to:', talentirMarketplace.address)
+
+  await talentirNFT.setMarketplaceAddress(talentirMarketplace.address)
 
   // Save deployment
   const currentDeploymentPath = deploymentPath()
