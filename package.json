@@ -2,11 +2,11 @@
   "name": "hardhat-project",
   "scripts": {
     "build": "npx hardhat compile",
-    "lint": "npx ts-standard",
-    "lintfix": "npx ts-standard --fix",
-    "solhint": "npx solhint 'contracts/**/*.sol' --fix && prettier --write 'contracts/**/*.sol'",
+    "lint": "npx ts-standard && npx solhint 'contracts/**/*.sol' && prettier 'contracts/**/*.sol'",
+    "lintfix": "npx ts-standard --fix && npx solhint 'contracts/**/*.sol' --fix && prettier --write 'contracts/**/*.sol'",
     "test": "npx hardhat test",
-    "deploy": "npx hardhat run scripts/deploy.ts"
+    "deploy": "npx hardhat run scripts/deploy.ts",
+    "prepare": "husky install"
   },
   "engines": {
     "node": ">=16.0.0"
@@ -27,6 +27,7 @@
     "ethers": "^5.5.4",
     "hardhat": "^2.8.3",
     "hardhat-gas-reporter": "^1.0.7",
+    "husky": "^7.0.4",
     "prettier": "^2.5.1",
     "prettier-plugin-solidity": "^1.0.0-beta.19",
     "solhint": "^3.3.6",
