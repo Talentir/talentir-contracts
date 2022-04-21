@@ -62,7 +62,7 @@ describe('TalentirNFT', function () {
     await expect(talentir.connect(account3).transferFrom(account1.address, account2.address, tokenID1))
       .to.be.reverted
 
-    await talentir.setMarketplaceAddress(account3.address)
+    await talentir.setNftMarketplaceApproval(account3.address, true)
 
     await expect(talentir.connect(account3).transferFrom(account1.address, account2.address, tokenID1))
       .to.not.be.reverted

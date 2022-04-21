@@ -1,10 +1,7 @@
-# Advanced Sample Hardhat Project
+# Talentir Smart Contracts - Using Hardhat
 
-This project demonstrates an advanced Hardhat use case, integrating other tools commonly used alongside Hardhat in the ecosystem.
-
-The project comes with a sample contract, a test for that contract, a sample script that deploys that contract, and an example of a task implementation, which simply lists the available accounts. It also comes with a variety of other tools, preconfigured to work with the project code.
-
-Try running some of the following tasks:
+This project contains the Talentir Smart Contracts written in Solidity and tested in Typescript.
+Here are some commands to get started.
 
 ```shell
 npx hardhat accounts
@@ -15,11 +12,11 @@ npx hardhat node
 npx hardhat help
 REPORT_GAS=true npx hardhat test
 npx hardhat coverage
-npx hardhat run scripts/deploy.ts
 TS_NODE_FILES=true npx ts-node scripts/deploy.ts
-npx ts-standard
-npx solhint 'contracts/**/*.sol'
-npx solhint 'contracts/**/*.sol' --fix
+
+npm run lint
+npm run lintfix
+npm run deploy
 ```
 
 # Etherscan verification
