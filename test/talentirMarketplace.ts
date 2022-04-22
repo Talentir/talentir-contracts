@@ -1,10 +1,8 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
-import { expect, use } from 'chai'
+import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
-import { FakeContract, smock } from '@defi-wonderland/smock'
-
-use(smock.matchers)
+import { smock } from '@defi-wonderland/smock'
 
 // eslint-disable-next-line
 import { TalentirMarketplace, TalentirNFT, IERC721 } from "../typechain-types";
@@ -347,8 +345,8 @@ describe('TalentirMarketplace', function () {
       .to.changeEtherBalance(luki, 975)
   })
 
-  it('NFT Contract without Royalties', async function () {
-    const ierc721fake: FakeContract<IERC721> = await smock.fake('IERC721')
+  it('NFT Contract without Royalties, Fake Contract', async function () {
+    const ierc721fake = await smock.fake<IERC721>('IERC721')
     await talentirMarketplace.setNftContractApproval(ierc721fake.address, true)
 
     ierc721fake.supportsInterface.returns(false)
