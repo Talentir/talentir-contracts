@@ -8,5 +8,6 @@
         "**/Thumbs.db": true,
         "**/node_modules": true
     },
-    "standard.treatErrorsAsWarnings": true
+    "standard.treatErrorsAsWarnings": true,
+    "solidity.defaultCompiler": "localFile"
 }

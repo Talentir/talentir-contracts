@@ -6,6 +6,8 @@ import { BytesLike } from 'ethers'
 // eslint-disable-next-line
 import { TalentirNFT } from "../typechain-types";
 
+// TODO: Test Burn
+
 // Reference : https://ethereum-waffle.readthedocs.io/en/latest/matchers.html
 describe('TalentirNFT', function () {
   let admin: SignerWithAddress
@@ -32,6 +34,10 @@ describe('TalentirNFT', function () {
     await talentir.grantRole(minterRole, account1.address)
 
     await expect(talentir.connect(account1).mint(account1.address, '', 'abcd', ethers.constants.AddressZero))
+      .to.not.be.reverted
+
+    const tokenID = await talentir.contentIdToTokenId('abcd')
+    await expect(talentir.connect(account1).burn(tokenID))
       .to.not.be.reverted
 
     // Minter
@@ -102,6 +108,23 @@ describe('TalentirNFT', function () {
     expect(await talentir.tokenURI(tokenID2)).to.equal('ipfs://' + cid2)
   })
 
+  it('Burning', async function () {
+    const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
+    const contentID1 = '1'
+    const tokenID1 = await talentir.contentIdToTokenId(contentID1)
+
+    // Mint uri1 for account 1.
+    await talentir.mint(account1.address, cid1, contentID1, ethers.constants.AddressZero)
+
+    // Owner can't burn
+    await expect(talentir.connect(account1).burn(tokenID1))
+      .to.be.reverted
+
+    // Admin can burn
+    await expect(talentir.burn(tokenID1))
+      .not.to.be.reverted
+  })
+
   it('Transfer', async function () {
     const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
     const cid2 = 'QmPRRnZcj3PeWi8nDnM94KnbfsW5pscoY16B25YxCd7NWA'
@@ -141,9 +164,14 @@ describe('TalentirNFT', function () {
     await expect(talentir.mint(account1.address, '', contentID, account2.address))
       .to.emit(talentir, 'UpdateRoyaltyReceiver')
       .withArgs(ethers.constants.AddressZero, account2.address, tokenID1)
+
     const result = await talentir.royaltyInfo(tokenID1, 100)
     expect(result[0]).to.equal(account2.address)
     expect(result[1]).to.equal(10)
+
+    // Fail for non-existing royalty info
+    await expect(talentir.connect(account1).royaltyInfo(1, 100))
+      .to.be.reverted
 
     await expect(talentir.updateRoyaltyReceiver(tokenID1, account3.address)).to.be.reverted
     await expect(talentir.connect(account1).updateRoyaltyReceiver(tokenID1, account3.address))
@@ -167,5 +195,37 @@ describe('TalentirNFT', function () {
     for (const dataElement of data) {
       expect(await talentir.supportsInterface(dataElement)).to.be.equal(true)
     }
+  })
+
+  it('Pause', async function () {
+    const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
+    const cid2 = 'QmPRRnZcj3PeWi8nDnM94KnbfsW5pscoY16B25YxCd7NWA'
+    const contentID1 = '1'
+    const contentID2 = '2'
+    const tokenID1 = await talentir.contentIdToTokenId(contentID1)
+
+    // Mint works
+    await expect(talentir.mint(account1.address, cid1, contentID1, ethers.constants.AddressZero))
+      .not.to.be.reverted
+
+    await talentir.pause(true)
+
+    // Mint should fail
+    await expect(talentir.mint(account2.address, cid2, contentID2, ethers.constants.AddressZero))
+      .to.be.revertedWith('Pausable: paused')
+
+    // Transfer should fail
+    await expect(talentir.connect(account1).transferFrom(account1.address, account3.address, tokenID1))
+      .to.be.revertedWith('Pausable: paused')
+
+    // Burn should fail
+    await expect(talentir.burn(tokenID1))
+      .to.be.revertedWith('Pausable: paused')
+
+    await talentir.pause(false)
+
+    // Mint should now work
+    await expect(talentir.mint(account2.address, cid2, contentID2, ethers.constants.AddressZero))
+      .not.to.be.reverted
   })
 })

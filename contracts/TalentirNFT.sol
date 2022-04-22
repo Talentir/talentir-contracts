@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.13;
+pragma solidity 0.8.9;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
@@ -49,13 +49,6 @@ contract TalentirNFT is ERC721, ERC721URIStorage, ERC721Royalty, AccessControl, 
      */
     function setNftMarketplaceApproval(address marketplace, bool approval) public onlyRole(DEFAULT_ADMIN_ROLE) {
         approvedMarketplaces[marketplace] = approval;
-    }
-
-    /**
-     * @notice This contract should never contain any ETH. This function allows us to recover it.
-     */
-    function withdrawFees(address payable receiver) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        Address.sendValue(receiver, address(this).balance);
     }
 
     // - MINTER_ROLE FUNCTIONS

@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: Unlicense
-pragma solidity ^0.8.4;
+pragma solidity 0.8.9;
 
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
@@ -12,7 +12,7 @@ contract ERC2981 is ERC165, IERC2981 {
     event UpdateRoyaltyReceiver(address from, address to, uint256 tokenID);
 
     function royaltyInfo(uint256 tokenId, uint256 value)
-        external
+        public
         view
         override
         returns (address receiver, uint256 royaltyAmount)

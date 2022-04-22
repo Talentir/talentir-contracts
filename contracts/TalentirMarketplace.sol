@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.13;
+pragma solidity 0.8.9;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
-// TODO: Function for cleaning up Sell & Buy Offers when owner has changed
 // TODO: Make sure makeBuyOffer always succeeds, even when previous offer blocks reimbursement
 
 /// @custom:security-contact jk@talentir.com
@@ -47,11 +46,11 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard, Pausable {
     event Sale(address nftAddress, uint256 tokenId, address seller, address buyer, uint256 value);
 
     // - ADMIN FUNCTIONS
-    function setNftContractApproval(address nftContract, bool approval) public onlyOwner {
+    function setNftContractApproval(address nftContract, bool approval) external onlyOwner {
         approvedNftContracts[nftContract] = approval;
     }
 
-    function setMarketPlaceFee(uint256 newMarketplaceFeePerMill) public onlyOwner {
+    function setMarketPlaceFee(uint256 newMarketplaceFeePerMill) external onlyOwner {
         marketplaceFeePerMill = newMarketplaceFeePerMill;
     }
 
@@ -59,15 +58,28 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard, Pausable {
         return address(this).balance - totalAmountInEscrow;
     }
 
-    function withdrawFees(address payable receiver) public onlyOwner {
+    function withdrawFees(address payable receiver) external onlyOwner {
         Address.sendValue(receiver, getFeeBalance());
     }
 
-    function setPause(bool shouldPause) public onlyOwner {
+    function setPause(bool shouldPause) external onlyOwner {
         if (shouldPause) {
             _pause();
         } else {
             _unpause();
+        }
+    }
+
+    /**
+     * If owner of the NFT changes outside of the scope of this marketplace, there's still an
+     * orphant Sell Offer. This function allows anyone to clean up this orphant Sell Offer.
+     */
+    function cleanupSelloffers(address nftAddress, uint256[] calldata tokenIds) external {
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            uint256 tokenID = tokenIds[i];
+            if (activeSellOffers[nftAddress][tokenID].seller != IERC721(nftAddress).ownerOf(tokenID)) {
+                delete activeSellOffers[nftAddress][tokenID];
+            }
         }
     }
 
@@ -254,8 +266,8 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard, Pausable {
 
     function _isMarketplaceApproved(address nftAddress, uint256 tokenId) private view returns (bool) {
         IERC721 nft = IERC721(nftAddress);
-        address owner = nft.ownerOf(tokenId);
         bool approved = nft.getApproved(tokenId) == address(this);
+        address owner = nft.ownerOf(tokenId);
         bool approvedForAll = nft.isApprovedForAll(owner, address(this));
         return approved || approvedForAll;
     }

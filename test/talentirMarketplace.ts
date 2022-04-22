@@ -1,10 +1,13 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
-import { expect } from 'chai'
+import { expect, use } from 'chai'
 import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
+import { FakeContract, smock } from '@defi-wonderland/smock'
+
+use(smock.matchers)
 
 // eslint-disable-next-line
-import { TalentirMarketplace, TalentirNFT, IERC721__factory } from "../typechain-types";
+import { TalentirMarketplace, TalentirNFT, IERC721 } from "../typechain-types";
 
 describe('TalentirMarketplace', function () {
   let admin: SignerWithAddress
@@ -334,9 +337,53 @@ describe('TalentirMarketplace', function () {
       .to.be.revertedWith('Price too low')
   })
 
+  it('Royalties Zero', async function () {
+    await talentirMarketplace.connect(luki).makeSellOffer(talentirNFT.address, nftTokenIds[0], 1000)
+    await talentirNFT.setRoyalty(0)
+
+    await expect(async () =>
+      await talentirMarketplace.connect(dave).purchase(talentirNFT.address, nftTokenIds[0], { value: 1000 })
+    )
+      .to.changeEtherBalance(luki, 975)
+  })
+
+  it('NFT Contract without Royalties', async function () {
+    const ierc721fake: FakeContract<IERC721> = await smock.fake('IERC721')
+    await talentirMarketplace.setNftContractApproval(ierc721fake.address, true)
+
+    ierc721fake.supportsInterface.returns(false)
+    ierc721fake.ownerOf.returns(luki.address)
+    ierc721fake.getApproved.returns(talentirMarketplace.address)
+
+    await expect(
+      talentirMarketplace.connect(luki).makeSellOffer(ierc721fake.address, nftTokenIds[0], 1000)
+    )
+      .not.to.be.reverted
+
+    await expect(async () =>
+      await talentirMarketplace.connect(dave).purchase(ierc721fake.address, nftTokenIds[0], { value: 1000 })
+    )
+      .to.changeEtherBalance(luki, 975)
+  })
+
+  it('Delete orphant Sell Offers', async function () {
+    // Create a Sell Offer
+    await talentirMarketplace.connect(luki).makeSellOffer(talentirNFT.address, nftTokenIds[0], 1000)
+
+    // Transfer to new owner
+    await talentirNFT.connect(luki).transferFrom(luki.address, dave.address, nftTokenIds[0])
+
+    // Sell offer still exists
+    const sellOffer = await talentirMarketplace.activeSellOffers(talentirNFT.address, nftTokenIds[0])
+    expect(sellOffer.seller).to.not.equal(ethers.constants.AddressZero)
+
+    // Clean up
+    await talentirMarketplace.cleanupSelloffers(talentirNFT.address, [nftTokenIds[0], nftTokenIds[1]])
+
+    // Now Sell offer is gone
+    const sellOfferNew = await talentirMarketplace.activeSellOffers(talentirNFT.address, nftTokenIds[0])
+    expect(sellOfferNew.seller).to.equal(ethers.constants.AddressZero)
+  })
+
   // TODO: test to check Buy Offer refund if Sell offer is purchased
-})
-
-describe('TalentirMarketplace + Mock', function () {
-
 })
