@@ -6,6 +6,8 @@
     "lintfix": "npx ts-standard --fix && npx solhint 'contracts/**/*.sol' --fix && prettier --write 'contracts/**/*.sol'",
     "test": "npx hardhat test",
     "deploy": "npx hardhat run scripts/deploy.ts",
+    "coverage": "npx hardhat coverage",
+    "gas": "REPORT_GAS=true npx hardhat test",
     "prepare": "husky install"
   },
   "engines": {

@@ -185,8 +185,6 @@ describe('TalentirMarketplace', function () {
       talentirMarketplace.connect(dave).purchase(talentirNFT.address, nftTokenIds[0], { value: 2000 })
     )
       .to.be.revertedWith('ERC721: transfer from incorrect owner')
-
-    // TODO: call and test cleanup function
   })
 
   it('Sell Offer: Check Balances, Withdrawal', async function () {
@@ -211,7 +209,7 @@ describe('TalentirMarketplace', function () {
     await expect(
       talentirMarketplace.connect(luki).makeSellOffer(talentirNFT.address, nftTokenIds[0], 0)
     )
-      .to.be.revertedWith('Price is zero')
+      .to.be.revertedWith('BuyOffer higher')
   })
 
   it('Buy Offer: Create and Withdraw', async function () {
@@ -287,6 +285,28 @@ describe('TalentirMarketplace', function () {
 
     // Still no fees to withdraw
     expect(await talentirMarketplace.getFeeBalance()).to.equal(0)
+  })
+
+  it('Buy Offer: Refunded when Sell Offer is happening', async function () {
+    await talentirMarketplace.connect(dave).makeBuyOffer(talentirNFT.address, nftTokenIds[0], { value: 500 })
+
+    await expect(
+      talentirMarketplace.connect(luki).makeSellOffer(talentirNFT.address, nftTokenIds[0], 400)
+    )
+      .to.be.revertedWith('BuyOffer higher')
+
+    await expect(
+      talentirMarketplace.connect(luki).makeSellOffer(talentirNFT.address, nftTokenIds[0], 600)
+    )
+      .to.not.be.reverted
+
+    const account = (await ethers.getSigners())[4]
+    await expect(async () =>
+      await talentirMarketplace.connect(account).purchase(talentirNFT.address, nftTokenIds[0], { value: 600 })
+    )
+      .to.changeEtherBalances([account, dave, talentirMarketplace, johnny], [-600, 500, -485, 60])
+
+    expect(await talentirMarketplace.getFeeBalance()).to.equal(15)
   })
 
   it('Buy Offer: Create and Accept', async function () {
@@ -429,6 +449,4 @@ describe('TalentirMarketplace', function () {
     // Funds can still be recovered as part of the fees from Talentir
     expect(await talentirMarketplace.getFeeBalance()).to.equal(500)
   })
-
-  // TODO: test to check Buy Offer refund if Sell offer is purchased
 })

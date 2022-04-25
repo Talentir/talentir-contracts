@@ -94,7 +94,8 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard, Pausable {
         ensureMarketplaceApproved(nftAddress, tokenId)
         tokenOwnerOnly(nftAddress, tokenId)
     {
-        require(minPrice != 0, "Price is zero");
+        // require(minPrice != 0, "Price is zero");
+        require(minPrice > activeBuyOffers[nftAddress][tokenId].price, "BuyOffer higher");
         activeSellOffers[nftAddress][tokenId] = SellOffer({seller: msg.sender, minPrice: minPrice});
 
         emit NewSellOffer(nftAddress, tokenId, msg.sender, minPrice);

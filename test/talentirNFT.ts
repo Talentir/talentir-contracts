@@ -6,8 +6,6 @@ import { BytesLike } from 'ethers'
 // eslint-disable-next-line
 import { TalentirNFT } from "../typechain-types";
 
-// TODO: Test Burn
-
 // Reference : https://ethereum-waffle.readthedocs.io/en/latest/matchers.html
 describe('TalentirNFT', function () {
   let admin: SignerWithAddress
