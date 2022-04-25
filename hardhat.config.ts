@@ -46,7 +46,7 @@ const config: HardhatUserConfig = {
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,
-    currency: 'USD',
+    currency: 'EUR',
     coinmarketcap: '2dfd2e2c-7816-4596-8a6d-c6faa14697ea',
     token: 'ETH'
   },

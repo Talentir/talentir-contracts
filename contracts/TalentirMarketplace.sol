@@ -8,8 +8,6 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
-// TODO: Make sure makeBuyOffer always succeeds, even when previous offer blocks reimbursement
-
 /// @custom:security-contact jk@talentir.com
 contract TalentirMarketplace is Ownable, ReentrancyGuard, Pausable {
     // - TYPES
@@ -39,7 +37,7 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard, Pausable {
     event NewSellOffer(address nftAddress, uint256 tokenId, address seller, uint256 value);
     event SellOfferWithdrawn(address nftAddress, uint256 tokenId, address seller);
 
-    event NewBuyOffer(address nftAddress, uint256 tokenId, address buyer, uint256 value);
+    event NewBuyOffer(address nftAddress, uint256 tokenId, address buyer, uint256 value, bool previousRefunded);
     event BuyOfferWithdrawn(address nftAddress, uint256 tokenId, address buyer);
 
     event RoyaltiesPaid(address nftAddress, uint256 tokenId, uint256 value, address receiver);
@@ -77,6 +75,7 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard, Pausable {
     function cleanupSelloffers(address nftAddress, uint256[] calldata tokenIds) external {
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint256 tokenID = tokenIds[i];
+
             if (activeSellOffers[nftAddress][tokenID].seller != IERC721(nftAddress).ownerOf(tokenID)) {
                 delete activeSellOffers[nftAddress][tokenID];
             }
@@ -151,11 +150,12 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard, Pausable {
 
         totalAmountInEscrow += offerPrice;
 
-        _removeBuyOffer(nftAddress, tokenId);
+        // When refund is blocked, just log, so higher BuyOffers can still be admitted
+        bool refunded = _removeBuyOffer(nftAddress, tokenId);
 
         activeBuyOffers[nftAddress][tokenId] = BuyOffer({buyer: msg.sender, price: offerPrice});
 
-        emit NewBuyOffer(nftAddress, tokenId, msg.sender, msg.value);
+        emit NewBuyOffer(nftAddress, tokenId, msg.sender, msg.value, refunded);
     }
 
     /**
@@ -164,7 +164,10 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard, Pausable {
     function withdrawBuyOffer(address nftAddress, uint256 tokenId) external nonReentrant {
         require(activeBuyOffers[nftAddress][tokenId].buyer == msg.sender, "Not buyer");
 
-        _removeBuyOffer(nftAddress, tokenId);
+        bool refunded = _removeBuyOffer(nftAddress, tokenId);
+
+        // Withdrawal is only successful, if refund was possible
+        require(refunded, "Refund rejected");
 
         emit BuyOfferWithdrawn(nftAddress, tokenId, msg.sender);
     }
@@ -192,12 +195,12 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard, Pausable {
 
     // - PRIVATE FUNCTIONS
 
-    function _removeBuyOffer(address nftAddress, uint256 tokenId) private {
+    function _removeBuyOffer(address nftAddress, uint256 tokenId) private returns (bool refunded) {
         address previousBuyOfferOwner = activeBuyOffers[nftAddress][tokenId].buyer;
         uint256 previousBuyOfferPrice = activeBuyOffers[nftAddress][tokenId].price;
 
         if (previousBuyOfferOwner == address(0)) {
-            return;
+            return false;
         }
 
         totalAmountInEscrow -= previousBuyOfferPrice;
@@ -205,7 +208,13 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard, Pausable {
         // Remove the current buy offer
         delete (activeBuyOffers[nftAddress][tokenId]);
 
-        Address.sendValue(payable(previousBuyOfferOwner), previousBuyOfferPrice);
+        // Make sure that this function always succeeds, even if Buyer blocks receiving. This
+        // prevents an attack where a Buyer could block receiving funds and not allow new (higher)
+        // offers. If the buyer sends ETH for an offer but blocks for receival, it's most likely
+        // malicious. Talentir can still recover the funds as part of the fee and send it back.
+        (bool success, ) = previousBuyOfferOwner.call{value: previousBuyOfferPrice}("");
+
+        return success;
     }
 
     function _exchangeNftForEth(

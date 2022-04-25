@@ -381,6 +381,53 @@ describe('TalentirMarketplace', function () {
     // Now Sell offer is gone
     const sellOfferNew = await talentirMarketplace.activeSellOffers(talentirNFT.address, nftTokenIds[0])
     expect(sellOfferNew.seller).to.equal(ethers.constants.AddressZero)
+
+    // Make another Sell Offer that should not be deleted
+    await talentirMarketplace.connect(dave).makeSellOffer(talentirNFT.address, nftTokenIds[1], 1000)
+
+    await talentirMarketplace.cleanupSelloffers(talentirNFT.address, [nftTokenIds[1]])
+
+    const sellOfferDave = await talentirMarketplace.activeSellOffers(talentirNFT.address, nftTokenIds[1])
+    expect(sellOfferDave.seller).to.be.equal(dave.address)
+  })
+
+  it('Test when Buyer refuses refund.', async function () {
+    const refundBlockedContractFactory = await ethers.getContractFactory('RefundBlockedTest')
+    const refundBlockedContract = await refundBlockedContractFactory.deploy()
+
+    // Fund contract with 1 ETH
+    await expect(
+      johnny.sendTransaction({ to: refundBlockedContract.address, value: ethers.utils.parseEther('1.0') })
+    ).to.not.be.reverted
+
+    // Now prevent contract from receving funds
+    await refundBlockedContract.enableBlock()
+
+    // Check that contract cannot receive fundes
+    await expect(
+      johnny.sendTransaction({ to: refundBlockedContract.address, value: 5 })
+    ).to.be.reverted
+
+    // Let contract make a buy offer
+    await expect(async () =>
+      await refundBlockedContract.makeBuyOffer(talentirMarketplace.address, talentirNFT.address, nftTokenIds[0], 500)
+    )
+      .to.changeEtherBalances([refundBlockedContract, talentirMarketplace], [-500, 500])
+
+    // Withdrawal is not possible, when refund ist rejected
+    await expect(
+      refundBlockedContract.withdrawBuyOffer(talentirMarketplace.address, talentirNFT.address, nftTokenIds[0])
+    )
+      .to.be.revertedWith('Refund rejected')
+
+    // But higher BuyOffers from other accounts are always allowed, even when refund is rejected.
+    await expect(async () =>
+      await talentirMarketplace.connect(dave).makeBuyOffer(talentirNFT.address, nftTokenIds[0], { value: 600 })
+    )
+      .to.changeEtherBalances([dave, refundBlockedContract, talentirMarketplace], [-600, 0, 600])
+
+    // Funds can still be recovered as part of the fees from Talentir
+    expect(await talentirMarketplace.getFeeBalance()).to.equal(500)
   })
 
   // TODO: test to check Buy Offer refund if Sell offer is purchased
