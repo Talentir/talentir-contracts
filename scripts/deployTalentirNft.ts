@@ -2,7 +2,7 @@ import { ethers } from 'hardhat'
 import * as hre from 'hardhat'
 import * as fs from 'fs'
 import { execSync } from 'child_process'
-import { deploymentPath } from './utils/deploymentPath'
+import { deploymentPath, verifyEtherscan } from './utils'
 
 async function main (): Promise<void> {
   const TalentirNFT = await ethers.getContractFactory('TalentirNFT')
@@ -13,10 +13,7 @@ async function main (): Promise<void> {
 
   // Save deployment
   const currentDeploymentPath = deploymentPath('TalentirNFT')
-
-  console.log(currentDeploymentPath)
-
-  fs.mkdirSync(currentDeploymentPath, { recursive: true })
+  console.log('Deployment Path: ', currentDeploymentPath)
 
   // Create Datafile which contains deployment info
   const jsonData = JSON.stringify({
@@ -35,12 +32,7 @@ async function main (): Promise<void> {
     'npx typechain --target=ethers-v5 ' + talentirNftAbi + ' --out-dir ' + outDir
   )
 
-  try {
-    await hre.run('verify:verify', { address: talentirNFT.address })
-    console.log('Verified on Etherscan!')
-  } catch (error) {
-    console.log('Couldnt verify on Etherscan:\n', error)
-  }
+  await verifyEtherscan(talentirNFT.address, talentirNFT.deployTransaction)
 }
 
 main().catch((error) => {

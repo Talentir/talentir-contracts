@@ -31,8 +31,10 @@ describe('TalentirMarketplace', function () {
     await talentirMarketplace.deployed()
 
     // They should approve each other
-    await talentirMarketplace.setNftContractApproval(talentirNFT.address, true)
-    await talentirNFT.setNftMarketplaceApproval(talentirMarketplace.address, true)
+    await expect(talentirMarketplace.setNftContractApproval(talentirNFT.address, true))
+      .to.emit(talentirMarketplace, 'NftContractApproved')
+    await expect(talentirNFT.setNftMarketplaceApproval(talentirMarketplace.address, true))
+      .to.emit(talentirNFT, 'MarketplaceApproved')
 
     // Mint 3 NFTs
     nftContentIds = ['LukisNFT', 'DavesNFT', 'JohnnysNFT']
@@ -50,7 +52,8 @@ describe('TalentirMarketplace', function () {
     const adminAddress = await admin.getAddress()
     expect(owner).to.equal(adminAddress)
 
-    await talentirMarketplace.setMarketPlaceFee(50)
+    await expect(talentirMarketplace.setMarketPlaceFee(50))
+      .to.emit(talentirMarketplace, 'MarketplaceFeeChanged')
     expect(await talentirMarketplace.marketplaceFeePerMill()).to.equal(50)
   })
 

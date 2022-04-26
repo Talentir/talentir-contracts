@@ -2,7 +2,7 @@ import { ethers } from 'hardhat'
 import * as hre from 'hardhat'
 import * as fs from 'fs'
 import { execSync } from 'child_process'
-import { deploymentPath } from './utils/deploymentPath'
+import { verifyEtherscan, deploymentPath } from './utils'
 
 async function main (): Promise<void> {
   const TalentirMarketplace = await ethers.getContractFactory('TalentirMarketplace')
@@ -14,7 +14,7 @@ async function main (): Promise<void> {
   // Save deployment
   const currentDeploymentPath = deploymentPath('TalentirMarketplace')
 
-  fs.mkdirSync(currentDeploymentPath, { recursive: true })
+  console.log('Deployment Path: ', currentDeploymentPath)
 
   // Create Datafile which contains deployment info
   const jsonData = JSON.stringify({
@@ -33,12 +33,7 @@ async function main (): Promise<void> {
     'npx typechain --target=ethers-v5 ' + talentirMarketplaceAbi + ' --out-dir ' + outDir
   )
 
-  try {
-    await hre.run('verify:verify', { address: talentirMarketplace.address })
-    console.log('Verified on Etherscan!')
-  } catch (error) {
-    console.log('Couldnt verify on Etherscan:\n', error)
-  }
+  await verifyEtherscan(talentirMarketplace.address, talentirMarketplace.deployTransaction)
 }
 
 // We recommend this pattern to be able to use async/await everywhere

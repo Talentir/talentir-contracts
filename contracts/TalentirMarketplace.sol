@@ -34,6 +34,9 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard, Pausable {
     uint256 public totalAmountInEscrow = 0;
 
     // - EVENTS
+    event NftContractApproved(address nftContractAddress, bool approved);
+    event MarketplaceFeeChanged(uint256 feePermill);
+
     event NewSellOffer(address nftAddress, uint256 tokenId, address seller, uint256 value);
     event SellOfferWithdrawn(address nftAddress, uint256 tokenId, address seller);
 
@@ -46,10 +49,12 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard, Pausable {
     // - ADMIN FUNCTIONS
     function setNftContractApproval(address nftContract, bool approval) external onlyOwner {
         approvedNftContracts[nftContract] = approval;
+        emit NftContractApproved(nftContract, approval);
     }
 
     function setMarketPlaceFee(uint256 newMarketplaceFeePerMill) external onlyOwner {
         marketplaceFeePerMill = newMarketplaceFeePerMill;
+        emit MarketplaceFeeChanged(newMarketplaceFeePerMill);
     }
 
     function getFeeBalance() public view returns (uint256 feeBalance) {
@@ -76,8 +81,10 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard, Pausable {
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint256 tokenID = tokenIds[i];
 
-            if (activeSellOffers[nftAddress][tokenID].seller != IERC721(nftAddress).ownerOf(tokenID)) {
+            address seller = activeSellOffers[nftAddress][tokenID].seller;
+            if (seller != IERC721(nftAddress).ownerOf(tokenID)) {
                 delete activeSellOffers[nftAddress][tokenID];
+                emit SellOfferWithdrawn(nftAddress, tokenID, seller);
             }
         }
     }

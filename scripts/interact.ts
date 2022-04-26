@@ -1,10 +1,10 @@
 import { ethers } from 'hardhat'
 
-import { TalentirNFT__factory } from '../deployments/TalentirNFT/localhost/0/types'
-import talentirNFTData from '../deployments/TalentirNFT/localhost/0/data.json'
+import { TalentirNFT__factory } from '../deployments/TalentirNFT/rinkeby/0/types'
+import talentirNFTData from '../deployments/TalentirNFT/rinkeby/0/data.json'
 
-import { TalentirMarketplace__factory } from '../deployments/TalentirMarketplace/localhost/0/types'
-import talentirMarketplaceData from '../deployments/TalentirMarketplace/localhost/0/data.json'
+import { TalentirMarketplace__factory } from '../deployments/TalentirMarketplace/rinkeby/0/types'
+import talentirMarketplaceData from '../deployments/TalentirMarketplace/rinkeby/0/data.json'
 
 async function main (): Promise<void> {
   const signer = await ethers.getSigners()
@@ -14,16 +14,16 @@ async function main (): Promise<void> {
   const talentirMarketplaceFactory = new TalentirMarketplace__factory(signer[0])
   const talentirMarketplace = talentirMarketplaceFactory.attach(talentirMarketplaceData.address)
 
-  await talentirNFT.approvedMarketplaces(talentirMarketplaceData.address)
-  console.log('TalentirNFT: Approved marketplace: ', talentirMarketplaceData.address)
+  const tx1 = await talentirNFT.setNftMarketplaceApproval(talentirMarketplaceData.address, true)
+  console.log('TalentirNFT: Approved marketplace: ', talentirMarketplaceData.address, ' tx:', tx1.hash)
 
-  await talentirMarketplace.approvedNftContracts(talentirNFTData.address)
-  console.log('TalentirMarketplace: Approved NFT: ', talentirNFTData.address)
+  const tx2 = await talentirMarketplace.setNftContractApproval(talentirNFTData.address, true)
+  console.log('TalentirMarketplace: Approved NFT: ', talentirNFTData.address, ' tx:', tx2.hash)
 
   // Grant the Google KMS the Minter Role
   const googleKmsPublicAddress = '0x257a6cc682eb2546e3f7a7b81b3cf3fcf5d884bb'
-  await talentirNFT.grantRole(await talentirNFT.MINTER_ROLE(), googleKmsPublicAddress)
-  console.log('TalentirNFT: Granted Minter Role to: ', googleKmsPublicAddress)
+  const tx3 = await talentirNFT.grantRole(await talentirNFT.MINTER_ROLE(), googleKmsPublicAddress)
+  console.log('TalentirNFT: Granted Minter Role to: ', googleKmsPublicAddress, ' tx:', tx3.hash)
 }
 
 main().catch((error) => {

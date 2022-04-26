@@ -9,5 +9,5 @@
     "declaration": true
   },
   "include": ["./scripts", "./test", "./typechain-types"],
-  "files": ["./hardhat.config.ts", "scripts/utils/deploymentPath.ts"]
+  "files": ["./hardhat.config.ts"]
 }

@@ -14,6 +14,9 @@ contract TalentirNFT is ERC721, ERC721URIStorage, ERC721Royalty, AccessControl, 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     mapping(address => bool) public approvedMarketplaces;
 
+    // - EVENTS
+    event MarketplaceApproved(address marketplaceAddress, bool approved);
+
     constructor() ERC721("Talentir", "TAL") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
@@ -39,8 +42,8 @@ contract TalentirNFT is ERC721, ERC721URIStorage, ERC721Royalty, AccessControl, 
      * @notice Changing the royalty percentage of every sale. Should be handled by the DAO in the
      * future.
      */
-    function setRoyalty(uint16 percentage) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        _royaltyPercentage = percentage;
+    function setRoyalty(uint16 permill) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setRoyaltyPermill(permill);
     }
 
     /**
@@ -49,6 +52,7 @@ contract TalentirNFT is ERC721, ERC721URIStorage, ERC721Royalty, AccessControl, 
      */
     function setNftMarketplaceApproval(address marketplace, bool approval) public onlyRole(DEFAULT_ADMIN_ROLE) {
         approvedMarketplaces[marketplace] = approval;
+        emit MarketplaceApproved(marketplace, approval);
     }
 
     // - MINTER_ROLE FUNCTIONS
