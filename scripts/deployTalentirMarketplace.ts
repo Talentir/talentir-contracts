@@ -32,6 +32,13 @@ async function main (): Promise<void> {
   execSync(
     'npx typechain --target=ethers-v5 ' + talentirMarketplaceAbi + ' --out-dir ' + outDir
   )
+
+  try {
+    await hre.run('verify:verify', { address: talentirMarketplace.address })
+    console.log('Verified on Etherscan!')
+  } catch (error) {
+    console.log('Couldnt verify on Etherscan:\n', error)
+  }
 }
 
 // We recommend this pattern to be able to use async/await everywhere

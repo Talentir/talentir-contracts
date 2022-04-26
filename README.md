@@ -10,14 +10,28 @@ npx hardhat clean
 npx hardhat test
 npx hardhat node
 npx hardhat help
-REPORT_GAS=true npx hardhat test
-npx hardhat coverage
 TS_NODE_FILES=true npx ts-node scripts/deploy.ts
-
-npm run lint
-npm run lintfix
-npm run deploy
 ```
+# Talentir Deploy Process
+- Deploy TalentirNFT
+```shell
+npx hardhat run scripts/deployTalentirNft.ts --network rinkeby
+npx hardhat run scripts/deployTalentirNft.ts --network localhost
+```
+
+- Deploy TalentirMarketplace
+```shell
+npx hardhat run scripts/deployTalentirMarketplace.ts --network rinkeby
+npx hardhat run scripts/deployTalentirMarketplace.ts --network localhost
+```
+
+- Interact
+Edit `scripts/interact.ts` to make sure you are interacting with the correct deployment
+```shell
+npx hardhat run scripts/interact.ts --network rinkeby
+npx hardhat run scripts/interact.ts --network localhost
+```
+
 
 # Etherscan verification
 
@@ -38,3 +52,6 @@ npx hardhat verify --network ropsten DEPLOYED_CONTRACT_ADDRESS "Hello, Hardhat!"
 # Performance optimizations
 
 For faster runs of your tests and scripts, consider skipping ts-node's type checking by setting the environment variable `TS_NODE_TRANSPILE_ONLY` to `1` in hardhat's environment. For more details see [the documentation](https://hardhat.org/guides/typescript.html#performance-optimizations).
+
+
+

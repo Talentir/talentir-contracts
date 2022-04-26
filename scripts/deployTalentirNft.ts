@@ -34,6 +34,13 @@ async function main (): Promise<void> {
   execSync(
     'npx typechain --target=ethers-v5 ' + talentirNftAbi + ' --out-dir ' + outDir
   )
+
+  try {
+    await hre.run('verify:verify', { address: talentirNFT.address })
+    console.log('Verified on Etherscan!')
+  } catch (error) {
+    console.log('Couldnt verify on Etherscan:\n', error)
+  }
 }
 
 main().catch((error) => {

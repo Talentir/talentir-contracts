@@ -210,7 +210,7 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard, Pausable {
 
         // Make sure that this function always succeeds, even if Buyer blocks receiving. This
         // prevents an attack where a Buyer could block receiving funds and not allow new (higher)
-        // offers. If the buyer sends ETH for an offer but blocks receival for refund, it's most 
+        // offers. If the buyer sends ETH for an offer but blocks receival for refund, it's most
         // likely malicious. Talentir can still recover the funds as part of the fee and send it back.
         (bool success, ) = previousBuyOfferOwner.call{value: previousBuyOfferPrice}("");
 
