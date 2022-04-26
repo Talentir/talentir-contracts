@@ -3,10 +3,11 @@
     "target": "es2018",
     "module": "commonjs",
     "strict": true,
+    "resolveJsonModule": true,
     "esModuleInterop": true,
     "outDir": "dist",
     "declaration": true
   },
   "include": ["./scripts", "./test", "./typechain-types"],
-  "files": ["./hardhat.config.ts"]
+  "files": ["./hardhat.config.ts", "scripts/utils/deploymentPath.ts"]
 }

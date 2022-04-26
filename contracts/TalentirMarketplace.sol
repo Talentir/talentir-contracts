@@ -69,7 +69,7 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard, Pausable {
     }
 
     /**
-     * If owner of the NFT changes outside of the scope of this marketplace, there's still an
+     * If owner of the NFT changes outside of the scope of this marketplace, there could still be an
      * orphant Sell Offer. This function allows anyone to clean up this orphant Sell Offer.
      */
     function cleanupSelloffers(address nftAddress, uint256[] calldata tokenIds) external {
@@ -94,7 +94,6 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard, Pausable {
         ensureMarketplaceApproved(nftAddress, tokenId)
         tokenOwnerOnly(nftAddress, tokenId)
     {
-        // require(minPrice != 0, "Price is zero");
         require(minPrice > activeBuyOffers[nftAddress][tokenId].price, "BuyOffer higher");
         activeSellOffers[nftAddress][tokenId] = SellOffer({seller: msg.sender, minPrice: minPrice});
 
@@ -211,8 +210,8 @@ contract TalentirMarketplace is Ownable, ReentrancyGuard, Pausable {
 
         // Make sure that this function always succeeds, even if Buyer blocks receiving. This
         // prevents an attack where a Buyer could block receiving funds and not allow new (higher)
-        // offers. If the buyer sends ETH for an offer but blocks for receival, it's most likely
-        // malicious. Talentir can still recover the funds as part of the fee and send it back.
+        // offers. If the buyer sends ETH for an offer but blocks receival for refund, it's most 
+        // likely malicious. Talentir can still recover the funds as part of the fee and send it back.
         (bool success, ) = previousBuyOfferOwner.call{value: previousBuyOfferPrice}("");
 
         return success;
