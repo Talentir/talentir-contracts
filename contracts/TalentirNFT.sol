@@ -1,26 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.9;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-import "./utils/ERC721Royalty.sol";
+import "./utils/ERC2981.sol";
 
-/// @custom:security-contact jk@talentir.com
-contract TalentirNFT is ERC721, ERC721URIStorage, ERC721Royalty, AccessControl, Pausable {
+/// @custom:security-contact office@talentir.com
+contract TalentirNFT is ERC1155(""), ERC2981, Ownable, Pausable {
     // - MEMBERS
-    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     mapping(address => bool) public approvedMarketplaces;
+    mapping(uint256 => string) private _tokenCIDs; // storing the IPFS CIDs
 
     // - EVENTS
     event MarketplaceApproved(address marketplaceAddress, bool approved);
-
-    constructor() ERC721("Talentir", "TAL") {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(MINTER_ROLE, msg.sender);
-    }
 
     // - ADMIN FUNCTIONS
     // At the beginning, these are centralized with Talentir but should be handled by the
@@ -30,7 +24,7 @@ contract TalentirNFT is ERC721, ERC721URIStorage, ERC721Royalty, AccessControl, 
      * @notice Pauses the transfer, minting and burning of Tokens. This is a security measure and
      * allows disabling the contract when migrating to a new version.
      */
-    function pause(bool shouldPause) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function pause(bool shouldPause) public onlyOwner {
         if (shouldPause) {
             _pause();
         } else {
@@ -42,15 +36,25 @@ contract TalentirNFT is ERC721, ERC721URIStorage, ERC721Royalty, AccessControl, 
      * @notice Changing the royalty percentage of every sale. Should be handled by the DAO in the
      * future.
      */
-    function setRoyalty(uint16 permill) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setRoyalty(uint16 permill) public onlyOwner {
         _setRoyaltyPermill(permill);
+    }
+
+    /**
+     * @notice The current royalty receiver (artist address) can be changed.
+     */
+    function setRoyaltyReceiver(uint256 tokenId, address receiver) public {
+        (receiver, ) = royaltyInfo(tokenId, 0);
+        require(msg.sender == receiver, "Only current receiver can update");
+
+        _setRoyaltyReceiver(tokenId, receiver);
     }
 
     /**
      * @notice Approve a new Marketplace Contract so users need less gas when selling and buying NFTs
      * on the Talentir contract.
      */
-    function setNftMarketplaceApproval(address marketplace, bool approval) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setNftMarketplaceApproval(address marketplace, bool approval) public onlyOwner {
         approvedMarketplaces[marketplace] = approval;
         emit MarketplaceApproved(marketplace, approval);
     }
@@ -61,21 +65,26 @@ contract TalentirNFT is ERC721, ERC721URIStorage, ERC721Royalty, AccessControl, 
      * @notice Safely mint a new token. The tokenId is calculated from the keccak256
      * hash of the provided contentID. This ensures that no duplicate content can be
      * minted.
+     * @param to The address to mint the token to.
+     * @param cid IPFS CID of the content
+     * @param contentID unique content ID, such as unique Youtube ID
+     * @param royaltyReceiver The address to receive the royalty for the token.
      */
     function mint(
-        address to,
-        string memory cid,
+        address to, // the address to mint the token to
+        string memory cid, // the IPFS CID of the content
         string memory contentID,
-        address royaltyReceiver
-    ) public onlyRole(MINTER_ROLE) {
+        address royaltyReceiver // the address to receive the royalty
+    ) public onlyOwner {
         uint256 tokenId = contentIdToTokenId(contentID);
-        _safeMint(to, tokenId);
-        _setTokenURI(tokenId, cid);
+        require(bytes(_tokenCIDs[tokenId]).length == 0, "Token already minted");
+        _mint(to, tokenId, 1000000, "");
+        _tokenCIDs[tokenId] = cid;
         _setRoyaltyReceiver(tokenId, royaltyReceiver);
     }
 
-    function burn(uint256 tokenID) public onlyRole(MINTER_ROLE) {
-        _burn(tokenID);
+    function uri(uint256 tokenId) public view override returns (string memory) {
+        return string(abi.encodePacked("ipfs://", _tokenCIDs[tokenId]));
     }
 
     // - PUBLIC FUNCTIONS
@@ -90,13 +99,6 @@ contract TalentirNFT is ERC721, ERC721URIStorage, ERC721Royalty, AccessControl, 
 
     // - UTILITY
     // @notice Makre sure Token Transfers are impossible when paused.
-    function _beforeTokenTransfer(
-        address from,
-        address to,
-        uint256 tokenId
-    ) internal override whenNotPaused {
-        super._beforeTokenTransfer(from, to, tokenId);
-    }
 
     /**
      * @notice Make sure the Talentir Marketplce is always approved to trade.
@@ -105,27 +107,18 @@ contract TalentirNFT is ERC721, ERC721URIStorage, ERC721Royalty, AccessControl, 
         return approvedMarketplaces[operator] == true || super.isApprovedForAll(owner, operator);
     }
 
-    // - OVERRIDES
-    // @notice The following functions are overrides required by Solidity.
-
-    function tokenURI(uint256 tokenId) public view override(ERC721, ERC721URIStorage) returns (string memory) {
-        return super.tokenURI(tokenId);
+    function _beforeTokenTransfer(
+        address operator,
+        address from,
+        address to,
+        uint256[] memory ids,
+        uint256[] memory amounts,
+        bytes memory data
+    ) internal override whenNotPaused {
+        super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
     }
 
-    function _burn(uint256 tokenId) internal override(ERC721, ERC721URIStorage, ERC721Royalty) {
-        super._burn(tokenId);
-    }
-
-    function _baseURI() internal pure override returns (string memory) {
-        return "ipfs://";
-    }
-
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(ERC721, ERC721Royalty, AccessControl)
-        returns (bool)
-    {
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC1155, ERC2981) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 }

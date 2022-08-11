@@ -42,6 +42,7 @@ contract ERC2981 is ERC165, IERC2981 {
     }
 
     function _setRoyaltyPermill(uint256 permill) internal {
+        // TODO: Range check
         emit RoyaltyPercentageChanged(permill);
         _royaltyPermill = permill;
     }
