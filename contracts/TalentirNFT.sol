@@ -12,6 +12,7 @@ contract TalentirNFT is ERC1155(""), ERC2981, Ownable, Pausable {
     // - MEMBERS
     mapping(address => bool) public approvedMarketplaces;
     mapping(uint256 => string) private _tokenCIDs; // storing the IPFS CIDs
+    address private _minterAddress;
 
     // - EVENTS
     event MarketplaceApproved(address marketplaceAddress, bool approved);
@@ -38,6 +39,10 @@ contract TalentirNFT is ERC1155(""), ERC2981, Ownable, Pausable {
      */
     function setRoyalty(uint16 permill) public onlyOwner {
         _setRoyaltyPermill(permill);
+    }
+
+    function setMinterRole(address minterAddress) public onlyOwner {
+        _minterAddress = minterAddress;
     }
 
     /**
@@ -75,7 +80,7 @@ contract TalentirNFT is ERC1155(""), ERC2981, Ownable, Pausable {
         string memory cid, // the IPFS CID of the content
         string memory contentID,
         address royaltyReceiver // the address to receive the royalty
-    ) public onlyOwner {
+    ) public onlyMinter {
         uint256 tokenId = contentIdToTokenId(contentID);
         require(bytes(_tokenCIDs[tokenId]).length == 0, "Token already minted");
         _mint(to, tokenId, 1000000, "");
@@ -120,5 +125,10 @@ contract TalentirNFT is ERC1155(""), ERC2981, Ownable, Pausable {
 
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC1155, ERC2981) returns (bool) {
         return super.supportsInterface(interfaceId);
+    }
+
+    modifier onlyMinter() {
+        require(_msgSender() == _minterAddress, "Not allowed");
+        _;
     }
 }
