@@ -53,20 +53,20 @@ TS_NODE_FILES=true npx ts-node scripts/deploy.ts
 ### Talentir Deploy Process
 - Deploy TalentirNFT
 ```shell
-npx hardhat run scripts/deployTalentirNft.ts --network rinkeby
+npx hardhat run scripts/deployTalentirNft.ts --network goerli
 npx hardhat run scripts/deployTalentirNft.ts --network localhost
 ```
 
 - Deploy TalentirMarketplace
 ```shell
-npx hardhat run scripts/deployTalentirMarketplace.ts --network rinkeby
+npx hardhat run scripts/deployTalentirMarketplace.ts --network goerli
 npx hardhat run scripts/deployTalentirMarketplace.ts --network localhost
 ```
 
 - Interact
 Edit `scripts/interact.ts` to make sure you are interacting with the correct deployment
 ```shell
-npx hardhat run scripts/interact.ts --network rinkeby
+npx hardhat run scripts/interact.ts --network goerli
 npx hardhat run scripts/interact.ts --network localhost
 ```
 
