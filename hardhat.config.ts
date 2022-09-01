@@ -38,8 +38,8 @@ const config: HardhatUserConfig = {
       accounts:
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : []
     },
-    arbitrumTestnet: {
-      url: process.env.ARBITRUM_RINKEBY_URL ?? '',
+    goerli: {
+      url: process.env.GOERLI_URL ?? '',
       accounts:
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : []
     }
@@ -54,6 +54,7 @@ const config: HardhatUserConfig = {
     apiKey: {
       mainnet: process.env.ETHERSCAN_API_KEY,
       rinkeby: process.env.ETHERSCAN_API_KEY,
+      goerli: process.env.ETHERSCAN_API_KEY,
       arbitrumOne: process.env.ARBISCAN_API_KEY,
       arbitrumTestnet: process.env.ARBISCAN_API_KEY
     }
