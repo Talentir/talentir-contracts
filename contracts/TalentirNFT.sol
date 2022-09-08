@@ -46,16 +46,6 @@ contract TalentirNFT is ERC1155(""), ERC2981, Ownable, Pausable {
     }
 
     /**
-     * @notice The current royalty receiver (artist address) can be changed.
-     */
-    function setRoyaltyReceiver(uint256 tokenId, address receiver) public {
-        (receiver, ) = royaltyInfo(tokenId, 0);
-        require(msg.sender == receiver, "Only current receiver can update");
-
-        _setRoyaltyReceiver(tokenId, receiver);
-    }
-
-    /**
      * @notice Approve a new Marketplace Contract so users need less gas when selling and buying NFTs
      * on the Talentir contract.
      */
@@ -85,7 +75,7 @@ contract TalentirNFT is ERC1155(""), ERC2981, Ownable, Pausable {
         require(bytes(_tokenCIDs[tokenId]).length == 0, "Token already minted");
         _mint(to, tokenId, 1000000, "");
         _tokenCIDs[tokenId] = cid;
-        _setRoyaltyReceiver(tokenId, royaltyReceiver);
+        _setTalent(tokenId, royaltyReceiver);
     }
 
     function uri(uint256 tokenId) public view override returns (string memory) {
