@@ -12,7 +12,7 @@ contract ERC2981 is ERC165, IERC2981 {
     // - EVENTS
     event RoyaltyPercentageChanged(uint256 permill);
 
-    event UpdateRoyaltyReceiver(address from, address to, uint256 tokenID);
+    event TalentChange(address from, address to, uint256 tokenID);
 
     function royaltyInfo(uint256 tokenId, uint256 value)
         public
@@ -38,7 +38,7 @@ contract ERC2981 is ERC165, IERC2981 {
     function _setTalent(uint256 tokenID, address talent) internal {
         address from = _talents[tokenID];
         _talents[tokenID] = talent;
-        emit UpdateRoyaltyReceiver(from, talent, tokenID);
+        emit TalentChange(from, talent, tokenID);
     }
 
     function _setRoyaltyPermill(uint256 permill) internal {
