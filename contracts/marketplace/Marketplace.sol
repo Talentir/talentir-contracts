@@ -20,7 +20,6 @@ import {Side, Order} from "./OrderTypes.sol";
 
 // TODO: whitelist ODER nur ein Vertrag
 // TODO: buyer fees rausnehmen, ERC2981-royalties-Kompatibilitaet ueberlegen
-// TODO: runden
 
 contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder {
     /// LIBRARIES ///
@@ -50,8 +49,9 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
     uint256 public nextOrderId;
     uint256 internal constant PERCENT = 100000;
     uint256 internal constant PRICE_FACTOR = 1000000000;
-    address[] feeAddresses;
-    uint256[] feePercents;
+    uint256 public roundingFactor = 1;
+    address[] public feeAddresses;
+    uint256[] public feePercents;
 
     /// EVENTS ///
     event OrderAdded(
@@ -70,6 +70,7 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
         uint256 remainingQuantity
     );
     event OrdersCancelled(uint256[] orderIds);
+    event DecimalsSet(uint32 decimals);
     event DefaultFeeSet(Side side, uint256 fee);
     event MarketFeeSet(address token, Side side, uint256 fee);
 
@@ -146,6 +147,7 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
         @notice Sell `tokenQuantity` of `token`:`tokenId` for min `WETHquantity` total price. (ERC1155)
         @dev Sell `tokenQuantity` of `token`:`tokenId` for min `WETHquantity` total price. (ERC1155)
         @dev Price limit must always be included to prevent frontrunning. 
+        @dev price will be rounded to 10^(18-roundingFactor) decimal places!
         @dev Does NOT work for ERC20!. 
         @dev can emit multiple OrderExecuted events. 
         @param token token address
@@ -168,6 +170,7 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
         @notice Buy `tokenQuantity` of `token`:`tokenId` for max `WETHquantity` total price. (ERC1155)
         @dev Buy `tokenQuantity` of `token`:`tokenId` for max `WETHquantity` total price. (ERC1155)
         @dev Price limit must always be included to prevent frontrunning. 
+        @dev price will be rounded to 10^(18-roundingFactor) decimal places!
         @dev Does NOT work for ERC20!. 
         @dev can emit multiple OrderExecuted events. 
         @param token token address
@@ -276,6 +279,17 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
         emit MarketFeeSet(_token, _side, _fee);
     }
 
+    /**
+        @dev Set significant decimal places.
+        @dev emits DecimalsSet event. 
+        @param _decimals uint32 number of significant decimal places
+     */
+    function setDecimals(uint32 _decimals) external onlyRole(MODERATOR_ROLE) {
+        require(_decimals <= 18, "Too many digits");
+        roundingFactor = 10**(18 - _decimals);
+        emit DecimalsSet(_decimals);
+    }
+
     /// INTERNAL FUNCTIONS ///
 
     /// @dev Return BUY for SELL or vice versa.
@@ -295,6 +309,7 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
         uint256 bestPrice;
         uint256 bestOrderId;
         uint256 price = (PRICE_FACTOR * _WETHquantity) / _tokenQuantity;
+        price = (price / roundingFactor) * roundingFactor;
         require(
             _side == Side.BUY
                 ? price * _tokenQuantity <= _WETHquantity * PRICE_FACTOR
