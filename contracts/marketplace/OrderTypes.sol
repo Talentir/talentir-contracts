@@ -9,7 +9,6 @@ enum Side {
 
 struct Order {
     uint256 orderId;
-    address token;
     uint256 tokenId;
     Side side;
     address sender;
