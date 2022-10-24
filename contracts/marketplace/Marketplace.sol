@@ -32,6 +32,7 @@ import {Side, Order} from "./OrderTypes.sol";
 // TODO: name TalentirMarketplaceV0
 // TODO: einzelne Events fuer cancelled orders
 // TODO: refactor safeTransfer functions
+// TODO: eine withdrawal funktion fuer die balances aus failed transfers
 
 contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder {
     /// LIBRARIES ///

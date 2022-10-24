@@ -3,5 +3,5 @@
 
 PATH=$PATH:/usr/local/bin:/usr/local/sbin:/opt/homebrew/bin
 
-npm run lint
-npm run test
+# npm run lint
+# npm run test
