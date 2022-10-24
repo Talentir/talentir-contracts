@@ -23,7 +23,7 @@ import {Side, Order} from "./OrderTypes.sol";
 // done: buyer fees rausnehmen, ERC2981-royalties-Kompatibilitaet ueberlegen
 // done: nur eine Fee
 // done: whitelist ODER nur ein Vertrag
-// TODO: ETH statt WETH
+// done: ETH statt WETH
 // Security
 // Handle error in external calls
 // https://consensys.github.io/smart-contract-best-practices/development-recommendations/general/external-calls/#favor-pull-over-push-for-external-calls%5Bpull-payment%5D
@@ -48,7 +48,6 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
     bytes32 public constant MODERATOR_ROLE = keccak256("MODERATOR_ROLE");
 
     /// CONTRACTS ///
-    IERC20 public WETHtoken;
 
     /// STATE ///
     mapping(uint256 => mapping(Side => OrderBook)) markets;
@@ -86,17 +85,12 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
 
     /// CONSTRUCTOR ///
 
-    constructor(
-        address _WETHaddress,
-        address _talentirNFT,
-        uint256 _nextOrderId
-    ) {
+    constructor(address _talentirNFT, uint256 _nextOrderId) {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(MODERATOR_ROLE, msg.sender);
         nextOrderId = _nextOrderId;
         TalentirNFT = _talentirNFT;
         require(IERC1155(TalentirNFT).supportsInterface(0x2a55205a)); // must implement ERC-2981 royalties standard
-        WETHtoken = IERC20(_WETHaddress);
     }
 
     /// VIEW FUNCTIONS ///
@@ -143,45 +137,44 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
     /// PUBLIC FUNCTIONS ///
 
     /**
-        @notice Sell `tokenQuantity` of token `tokenId` for min `WETHquantity` total price. (ERC1155)
-        @dev Sell `tokenQuantity` of token `tokenId` for min `WETHquantity` total price. (ERC1155)
+        @notice Sell `tokenQuantity` of token `tokenId` for min `ETHquantity` total price. (ERC1155)
+        @dev Sell `tokenQuantity` of token `tokenId` for min `ETHquantity` total price. (ERC1155)
         @dev Price limit must always be included to prevent frontrunning. 
         @dev price will be rounded to 10^(18-roundingFactor) decimal places!
         @dev Does NOT work for ERC20!. 
         @dev can emit multiple OrderExecuted events. 
         @param tokenId token Id (ERC1155)
-        @param WETHquantity total WETH demanded (quantity*minimum price per unit, in units of 10^18)
+        @param ETHquantity total WETH demanded (quantity*minimum price per unit, in units of 10^18)
         @param tokenQuantity how much to sell in total of token (in units of 10^tokenDecimals)
         @param addUnfilledOrderToOrderbook add order to order list at a limit price of WETHquantity/tokenQuantity if it can't be filled
      */
     function makeSellOrderERC1155(
         uint256 tokenId,
-        uint256 WETHquantity,
+        uint256 ETHquantity,
         uint256 tokenQuantity,
         bool addUnfilledOrderToOrderbook
     ) external whenNotPaused {
-        _makeOrder(tokenId, Side.SELL, WETHquantity, tokenQuantity, addUnfilledOrderToOrderbook);
+        _makeOrder(tokenId, Side.SELL, ETHquantity, tokenQuantity, addUnfilledOrderToOrderbook);
     }
 
     /**
-        @notice Buy `tokenQuantity` of token `tokenId` for max `WETHquantity` total price. (ERC1155)
-        @dev Buy `tokenQuantity` of token `tokenId` for max `WETHquantity` total price. (ERC1155)
+        @notice Buy `tokenQuantity` of token `tokenId` for max `msg.value` total price.
+        @dev Buy `tokenQuantity` of token `tokenId` for max `msg.value` total price.
         @dev Price limit must always be included to prevent frontrunning. 
         @dev price will be rounded to 10^(18-roundingFactor) decimal places!
         @dev Does NOT work for ERC20!. 
         @dev can emit multiple OrderExecuted events. 
         @param tokenId token Id (ERC1155)
-        @param WETHquantity total WETH offered (quantity*maximum price per unit, in units of 10^18)
         @param tokenQuantity how much to buy in total of token (in units of 10^tokenDecimals)
         @param addUnfilledOrderToOrderbook add order to order list at a limit price of WETHquantity/tokenQuantity if it can't be filled
+        @dev `msg.value` total ETH offered (quantity*maximum price per unit, in units of 10^18)
      */
     function makeBuyOrderERC1155(
         uint256 tokenId,
-        uint256 WETHquantity,
         uint256 tokenQuantity,
         bool addUnfilledOrderToOrderbook
-    ) external whenNotPaused {
-        _makeOrder(tokenId, Side.BUY, WETHquantity, tokenQuantity, addUnfilledOrderToOrderbook);
+    ) external payable whenNotPaused {
+        _makeOrder(tokenId, Side.BUY, msg.value, tokenQuantity, addUnfilledOrderToOrderbook);
     }
 
     /**
@@ -191,6 +184,7 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
         @param orderIds array of order Ids
      */
     function cancelOrders(uint256[] calldata orderIds) external nonReentrant {
+        bool success;
         for (uint256 i = 0; i < orderIds.length; i++) {
             uint256 orderId = orderIds[i];
             require(msg.sender == orders[orderId].sender, "Wrong user");
@@ -200,7 +194,7 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
             uint256 tokenId = orders[orderId].tokenId;
             _removeOrder(orderId);
             if (side == Side.BUY) {
-                WETHtoken.transfer(msg.sender, (price * quantity) / PRICE_FACTOR);
+                (success, ) = msg.sender.call{value: (price * quantity) / PRICE_FACTOR}("");
             } else {
                 _safeTransferOut(TalentirNFT, tokenId, msg.sender, quantity);
             }
@@ -256,18 +250,18 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
     function _makeOrder(
         uint256 _tokenId,
         Side _side,
-        uint256 _WETHquantity,
+        uint256 _ETHquantity,
         uint256 _tokenQuantity,
         bool _addOrderForRemaining
     ) internal {
         uint256 bestPrice;
         uint256 bestOrderId;
-        uint256 price = (PRICE_FACTOR * _WETHquantity) / _tokenQuantity;
+        uint256 price = (PRICE_FACTOR * _ETHquantity) / _tokenQuantity;
         price = (price / roundingFactor) * roundingFactor;
         require(
             _side == Side.BUY
-                ? price * _tokenQuantity <= _WETHquantity * PRICE_FACTOR
-                : price * _tokenQuantity >= _WETHquantity * PRICE_FACTOR,
+                ? price * _tokenQuantity <= _ETHquantity * PRICE_FACTOR
+                : price * _tokenQuantity >= _ETHquantity * PRICE_FACTOR,
             "Rounding problem"
         );
         Side oppositeSide = _oppositeSide(_side);
@@ -304,15 +298,12 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
             Side side = orders[_orderId].side;
             uint256 price = orders[_orderId].price;
             address sender = orders[_orderId].sender;
-            uint256 transactionVolume = (price * _quantity) / PRICE_FACTOR;
-
+            bool success;
             (address royaltiesReceiver, uint256 royaltiesAmount) = IERC2981(TalentirNFT).royaltyInfo(
                 tokenId,
-                transactionVolume
+                (price * _quantity) / PRICE_FACTOR
             );
-            uint256 talentirFee = calcTalentirFee(transactionVolume);
-            transactionVolume -= royaltiesAmount - talentirFee;
-            require(transactionVolume > 0, "Problem calculating fees");
+            uint256 talentirFee = calcTalentirFee((price * _quantity) / PRICE_FACTOR);
 
             if (_quantity == orders[_orderId].quantity) {
                 _removeOrder(_orderId);
@@ -322,19 +313,23 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
             if (side == Side.BUY) {
                 // Original order was a buy order: WETH has already been transferred into the contract
                 // Distribute Fees from contract
-                WETHtoken.transfer(royaltiesReceiver, royaltiesAmount);
-                WETHtoken.transfer(talentirFeeWallet, talentirFee);
+                (success, ) = royaltiesReceiver.call{value: royaltiesAmount}("");
+                (success, ) = talentirFeeWallet.call{value: talentirFee}("");
                 // Caller is the seller - distribute to buyer first
                 _safeTransferFrom(TalentirNFT, tokenId, msg.sender, sender, _quantity);
                 // Seller receives price*quantity - fees
-                WETHtoken.transfer(msg.sender, transactionVolume);
+                (success, ) = msg.sender.call{
+                    value: (price * _quantity) / PRICE_FACTOR - royaltiesAmount - talentirFee
+                }("");
             } else {
                 // Original order was a sell order: NFT has already been transferred into the contract
-                // Distribute Fees from sender wallet
-                WETHtoken.transferFrom(msg.sender, royaltiesReceiver, royaltiesAmount);
-                WETHtoken.transferFrom(msg.sender, talentirFeeWallet, talentirFee);
+                // Distribute Fees
+                (success, ) = royaltiesReceiver.call{value: royaltiesAmount}("");
+                (success, ) = talentirFeeWallet.call{value: talentirFee}("");
                 // Caller is the buyer - distribute to seller first
-                WETHtoken.transferFrom(msg.sender, sender, transactionVolume);
+                (success, ) = msg.sender.call{
+                    value: (price * _quantity) / PRICE_FACTOR - royaltiesAmount - talentirFee
+                }("");
                 _safeTransferOut(TalentirNFT, tokenId, msg.sender, _quantity);
             }
             emit OrderExecuted(_orderId, msg.sender, _quantity, orders[_orderId].quantity);
@@ -350,9 +345,7 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
         uint256 _quantity
     ) internal {
         // Transfer tokens to this contract
-        if (_side == Side.BUY) {
-            WETHtoken.transferFrom(msg.sender, address(this), (_price * _quantity) / PRICE_FACTOR);
-        } else {
+        if (_side == Side.SELL) {
             _safeTransferIn(TalentirNFT, _tokenId, msg.sender, _quantity);
         }
         // Check if orders already exist at that price, otherwise add tree entry
