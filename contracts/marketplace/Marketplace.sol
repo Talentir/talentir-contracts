@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.9;
+pragma solidity 0.8.17;
 
 /// CONTRACTS ///
 import "@openzeppelin/contracts/security/Pausable.sol";
@@ -24,17 +24,17 @@ import {Side, Order} from "./OrderTypes.sol";
 // done: nur eine Fee
 // done: whitelist ODER nur ein Vertrag
 // done: ETH statt WETH
+// done: priceFactor nochmal ueberpruefen
+// done: OrderExecuted enthaelt Preis und Royalties
+// done: einzelne Events fuer cancelled orders
+// done: refactor safeTransfer functions
+// done: name TalentirMarketplaceV0
 // Security
 // Handle error in external calls
 // https://consensys.github.io/smart-contract-best-practices/development-recommendations/general/external-calls/#favor-pull-over-push-for-external-calls%5Bpull-payment%5D
-// TODO: OrderExecuted enthaelt Preis
-// TODO: priceFactor nochmal ueberpruefen
-// TODO: name TalentirMarketplaceV0
-// TODO: einzelne Events fuer cancelled orders
-// TODO: refactor safeTransfer functions
 // TODO: eine withdrawal funktion fuer die balances aus failed transfers
 
-contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder {
+contract TalentirMarketplaceV0 is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder {
     /// LIBRARIES ///
     using RBTLibrary for RBTLibrary.Tree;
     using LinkedListLibrary for LinkedListLibrary.LinkedList;
@@ -60,7 +60,6 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
     address public talentirFeeWallet;
     uint256 public nextOrderId;
     uint256 internal constant PERCENT = 100000;
-    uint256 internal constant PRICE_FACTOR = 1000000000;
     uint256 public roundingFactor = 1;
     address[] public feeAddresses;
     uint256[] public feePercents;
@@ -77,10 +76,12 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
     event OrderExecuted(
         uint256 indexed orderId,
         address indexed initiator,
+        uint256 price,
+        uint256 royalties,
         uint256 quantity,
         uint256 remainingQuantity
     );
-    event OrdersCancelled(uint256[] orderIds);
+    event OrderCancelled(uint256 orderId);
     event DecimalsSet(uint32 decimals);
     event TalentirFeeSet(uint256 fee, address wallet);
 
@@ -149,7 +150,7 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
         @param tokenQuantity how much to sell in total of token (in units of 10^tokenDecimals)
         @param addUnfilledOrderToOrderbook add order to order list at a limit price of WETHquantity/tokenQuantity if it can't be filled
      */
-    function makeSellOrderERC1155(
+    function makeSellOrder(
         uint256 tokenId,
         uint256 ETHquantity,
         uint256 tokenQuantity,
@@ -170,7 +171,7 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
         @param addUnfilledOrderToOrderbook add order to order list at a limit price of WETHquantity/tokenQuantity if it can't be filled
         @dev `msg.value` total ETH offered (quantity*maximum price per unit, in units of 10^18)
      */
-    function makeBuyOrderERC1155(
+    function makeBuyOrder(
         uint256 tokenId,
         uint256 tokenQuantity,
         bool addUnfilledOrderToOrderbook
@@ -195,12 +196,12 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
             uint256 tokenId = orders[orderId].tokenId;
             _removeOrder(orderId);
             if (side == Side.BUY) {
-                (success, ) = msg.sender.call{value: (price * quantity) / PRICE_FACTOR}("");
+                (success, ) = msg.sender.call{value: (price * quantity)}("");
             } else {
-                _safeTransferOut(TalentirNFT, tokenId, msg.sender, quantity);
+                _safeTransferFrom(TalentirNFT, tokenId, address(this), msg.sender, quantity);
             }
+            emit OrderCancelled(orderId);
         }
-        emit OrdersCancelled(orderIds);
     }
 
     /// RESTRICTED PUBLIC FUNCTIONS ///
@@ -257,12 +258,10 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
     ) internal {
         uint256 bestPrice;
         uint256 bestOrderId;
-        uint256 price = (PRICE_FACTOR * _ETHquantity) / _tokenQuantity;
+        uint256 price = (_ETHquantity) / _tokenQuantity;
         price = (price / roundingFactor) * roundingFactor;
         require(
-            _side == Side.BUY
-                ? price * _tokenQuantity <= _ETHquantity * PRICE_FACTOR
-                : price * _tokenQuantity >= _ETHquantity * PRICE_FACTOR,
+            _side == Side.BUY ? price * _tokenQuantity <= _ETHquantity : price * _tokenQuantity >= _ETHquantity,
             "Rounding problem"
         );
         Side oppositeSide = _oppositeSide(_side);
@@ -302,9 +301,9 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
             bool success;
             (address royaltiesReceiver, uint256 royaltiesAmount) = IERC2981(TalentirNFT).royaltyInfo(
                 tokenId,
-                (price * _quantity) / PRICE_FACTOR
+                (price * _quantity)
             );
-            uint256 talentirFee = calcTalentirFee((price * _quantity) / PRICE_FACTOR);
+            uint256 talentirFee = calcTalentirFee((price * _quantity));
 
             if (_quantity == orders[_orderId].quantity) {
                 _removeOrder(_orderId);
@@ -319,21 +318,17 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
                 // Caller is the seller - distribute to buyer first
                 _safeTransferFrom(TalentirNFT, tokenId, msg.sender, sender, _quantity);
                 // Seller receives price*quantity - fees
-                (success, ) = msg.sender.call{
-                    value: (price * _quantity) / PRICE_FACTOR - royaltiesAmount - talentirFee
-                }("");
+                (success, ) = msg.sender.call{value: (price * _quantity) - royaltiesAmount - talentirFee}("");
             } else {
                 // Original order was a sell order: NFT has already been transferred into the contract
                 // Distribute Fees
                 (success, ) = royaltiesReceiver.call{value: royaltiesAmount}("");
                 (success, ) = talentirFeeWallet.call{value: talentirFee}("");
                 // Caller is the buyer - distribute to seller first
-                (success, ) = msg.sender.call{
-                    value: (price * _quantity) / PRICE_FACTOR - royaltiesAmount - talentirFee
-                }("");
-                _safeTransferOut(TalentirNFT, tokenId, msg.sender, _quantity);
+                (success, ) = msg.sender.call{value: (price * _quantity) - royaltiesAmount - talentirFee}("");
+                _safeTransferFrom(TalentirNFT, tokenId, address(this), msg.sender, _quantity);
             }
-            emit OrderExecuted(_orderId, msg.sender, _quantity, orders[_orderId].quantity);
+            emit OrderExecuted(_orderId, msg.sender, price, royaltiesAmount, _quantity, orders[_orderId].quantity);
         }
     }
 
@@ -347,7 +342,7 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
     ) internal {
         // Transfer tokens to this contract
         if (_side == Side.SELL) {
-            _safeTransferIn(TalentirNFT, _tokenId, msg.sender, _quantity);
+            _safeTransferFrom(TalentirNFT, _tokenId, _sender, address(this), _quantity);
         }
         // Check if orders already exist at that price, otherwise add tree entry
         if (!markets[_tokenId][_side].priceTree.exists(_price)) {
@@ -388,31 +383,6 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
         delete (orders[_orderId]);
     }
 
-    /// @dev Checks contract balance before and after transfer - prevents reflections or other potentially unexpected behaviour
-    function _safeTransferIn(
-        address _token,
-        uint256 _tokenId,
-        address _sender,
-        uint256 _quantity
-    ) internal {
-        uint256 balanceBefore = _balanceOf(_token, _tokenId, address(this));
-        _safeTransferFrom(_token, _tokenId, _sender, address(this), _quantity);
-        require((_balanceOf(_token, _tokenId, address(this)) - balanceBefore) >= _quantity, "Transfer problem");
-    }
-
-    /// @dev Checks contract balance before and after transfer - prevents reflections or other potentially unexpected behaviour
-    function _safeTransferOut(
-        address _token,
-        uint256 _tokenId,
-        address _receiver,
-        uint256 _quantity
-    ) internal {
-        uint256 balanceBefore = _balanceOf(_token, _tokenId, address(this));
-        _safeTransferFrom(_token, _tokenId, address(this), _receiver, _quantity);
-
-        require(balanceBefore - _balanceOf(_token, _tokenId, address(this)) <= _quantity, "Transfer problem");
-    }
-
     /// @dev Calls safeTransferFrom (ERC1155)
     function _safeTransferFrom(
         address _token,
@@ -423,14 +393,5 @@ contract Marketplace is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder 
     ) internal {
         bytes memory data;
         IERC1155(_token).safeTransferFrom(_from, _to, _tokenId, _quantity, data);
-    }
-
-    /// @dev Calls balanceOf.
-    function _balanceOf(
-        address _token,
-        uint256 _tokenId,
-        address _account
-    ) internal view returns (uint256) {
-        return IERC1155(_token).balanceOf(_account, _tokenId);
     }
 }
