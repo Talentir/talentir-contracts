@@ -33,6 +33,7 @@ import {Side, Order} from "./OrderTypes.sol";
 // Handle error in external calls
 // https://consensys.github.io/smart-contract-best-practices/development-recommendations/general/external-calls/#favor-pull-over-push-for-external-calls%5Bpull-payment%5D
 // TODO: eine withdrawal funktion fuer die balances aus failed transfers
+// Ownable statt AccessControl
 
 contract TalentirMarketplaceV0 is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder {
     /// LIBRARIES ///
@@ -78,6 +79,7 @@ contract TalentirMarketplaceV0 is Pausable, AccessControl, ReentrancyGuard, ERC1
         address indexed initiator,
         uint256 price,
         uint256 royalties,
+        address royaltiesReceiver,
         uint256 quantity,
         uint256 remainingQuantity
     );
@@ -328,7 +330,15 @@ contract TalentirMarketplaceV0 is Pausable, AccessControl, ReentrancyGuard, ERC1
                 (success, ) = msg.sender.call{value: (price * _quantity) - royaltiesAmount - talentirFee}("");
                 _safeTransferFrom(TalentirNFT, tokenId, address(this), msg.sender, _quantity);
             }
-            emit OrderExecuted(_orderId, msg.sender, price, royaltiesAmount, _quantity, orders[_orderId].quantity);
+            emit OrderExecuted(
+                _orderId,
+                msg.sender,
+                price,
+                royaltiesAmount,
+                royaltiesReceiver,
+                _quantity,
+                orders[_orderId].quantity
+            );
         }
     }
 
