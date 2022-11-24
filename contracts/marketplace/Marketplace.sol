@@ -3,7 +3,7 @@ pragma solidity 0.8.17;
 
 /// CONTRACTS ///
 import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 
@@ -29,13 +29,14 @@ import {Side, Order} from "./OrderTypes.sol";
 // done: einzelne Events fuer cancelled orders
 // done: refactor safeTransfer functions
 // done: name TalentirMarketplaceV0
+// done: Ownable statt AccessControl
 // Security
 // Handle error in external calls
 // https://consensys.github.io/smart-contract-best-practices/development-recommendations/general/external-calls/#favor-pull-over-push-for-external-calls%5Bpull-payment%5D
 // TODO: eine withdrawal funktion fuer die balances aus failed transfers
-// Ownable statt AccessControl
+// TODO: Decimals Beschreibungen in den Kommentaren aktualisieren
 
-contract TalentirMarketplaceV0 is Pausable, AccessControl, ReentrancyGuard, ERC1155Holder {
+contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Holder {
     /// LIBRARIES ///
     using RBTLibrary for RBTLibrary.Tree;
     using LinkedListLibrary for LinkedListLibrary.LinkedList;
@@ -45,9 +46,6 @@ contract TalentirMarketplaceV0 is Pausable, AccessControl, ReentrancyGuard, ERC1
         RBTLibrary.Tree priceTree;
         mapping(uint256 => LinkedListLibrary.LinkedList) orderList;
     }
-
-    /// ROLES ///
-    bytes32 public constant MODERATOR_ROLE = keccak256("MODERATOR_ROLE");
 
     /// CONTRACTS ///
 
@@ -62,8 +60,6 @@ contract TalentirMarketplaceV0 is Pausable, AccessControl, ReentrancyGuard, ERC1
     uint256 public nextOrderId;
     uint256 internal constant PERCENT = 100000;
     uint256 public roundingFactor = 1;
-    address[] public feeAddresses;
-    uint256[] public feePercents;
 
     /// EVENTS ///
     event OrderAdded(
@@ -90,8 +86,6 @@ contract TalentirMarketplaceV0 is Pausable, AccessControl, ReentrancyGuard, ERC1
     /// CONSTRUCTOR ///
 
     constructor(address _talentirNFT, uint256 _nextOrderId) {
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _setupRole(MODERATOR_ROLE, msg.sender);
         nextOrderId = _nextOrderId;
         TalentirNFT = _talentirNFT;
         require(IERC1155(TalentirNFT).supportsInterface(0x2a55205a)); // must implement ERC-2981 royalties standard
@@ -122,20 +116,6 @@ contract TalentirMarketplaceV0 is Pausable, AccessControl, ReentrancyGuard, ERC1
      */
     function calcTalentirFee(uint256 _totalPaid) public view returns (uint256) {
         return ((100 * talentirFeePercent * _totalPaid) / PERCENT) / 100;
-    }
-
-    /// @dev See {IERC165-supportsInterface}.
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        virtual
-        override(AccessControl, ERC1155Receiver)
-        returns (bool)
-    {
-        return
-            interfaceId == type(IAccessControl).interfaceId ||
-            interfaceId == type(IERC1155Receiver).interfaceId ||
-            super.supportsInterface(interfaceId);
     }
 
     /// PUBLIC FUNCTIONS ///
@@ -209,12 +189,12 @@ contract TalentirMarketplaceV0 is Pausable, AccessControl, ReentrancyGuard, ERC1
     /// RESTRICTED PUBLIC FUNCTIONS ///
 
     /// @dev Pause contract.
-    function pause() external onlyRole(MODERATOR_ROLE) {
+    function pause() external onlyOwner {
         _pause();
     }
 
     /// @dev Unpause contract.
-    function unpause() external onlyRole(MODERATOR_ROLE) {
+    function unpause() external onlyOwner {
         _unpause();
     }
 
@@ -225,7 +205,7 @@ contract TalentirMarketplaceV0 is Pausable, AccessControl, ReentrancyGuard, ERC1
         @param _fee fee percent (100% = 100,000)
         @param _wallet address where Talentir fee will be sent to
      */
-    function setTalentirFee(uint256 _fee, address _wallet) external onlyRole(MODERATOR_ROLE) {
+    function setTalentirFee(uint256 _fee, address _wallet) external onlyOwner {
         require(_fee <= PERCENT / 10, "Must be <10k"); // Talentir fee can never be higher than 10%
         talentirFeePercent = _fee;
         talentirFeeWallet = _wallet;
@@ -237,7 +217,7 @@ contract TalentirMarketplaceV0 is Pausable, AccessControl, ReentrancyGuard, ERC1
         @dev emits DecimalsSet event. 
         @param _decimals uint32 number of significant decimal places
      */
-    function setDecimals(uint32 _decimals) external onlyRole(MODERATOR_ROLE) {
+    function setDecimals(uint32 _decimals) external onlyOwner {
         require(_decimals <= 18, "Too many digits");
         roundingFactor = 10**(18 - _decimals);
         emit DecimalsSet(_decimals);
