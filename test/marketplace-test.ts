@@ -25,6 +25,12 @@ describe("Marketplace Tests", function () {
     );
     marketplace = await MarketplaceFactory.deploy(talentirNFT.address, 1);
     await marketplace.deployed();
+    // Can't mint token before minter role is set
+    expect(
+      talentirNFT.mint(seller.address, "abc", "abc", royaltyReceiver.address)
+    ).to.be.revertedWith("Not allowed");
+    // Set minter role to owner
+    await talentirNFT.setMinterRole(owner.address);
   });
 
   it("should open and close a single order (no fees, no rounding)", async function () {
@@ -32,15 +38,10 @@ describe("Marketplace Tests", function () {
     expect(
       marketplace.connect(seller).makeSellOrder(1, 1, 1, true)
     ).to.be.revertedWith("ERC1155: caller is not token owner nor approved");
-    // Can't mint token before minter role is set
-    expect(
-      talentirNFT.mint(seller.address, "abc", "abc", royaltyReceiver.address)
-    ).to.be.revertedWith("Not allowed");
     // Mint token to seller
-    await talentirNFT.setMinterRole(owner.address);
     await talentirNFT.mint(
       seller.address,
-      "abc",
+      "abcd",
       "abc",
       royaltyReceiver.address
     );
@@ -130,11 +131,11 @@ describe("Marketplace Tests", function () {
     expect(order.quantity).to.equal(1);
   });
 
-  it("should handle multiple orders in FIFO order, allow cancelling", async function () {});
-
   it("should distribute fees correctly", async function () {});
 
   it("should handle rounding correctly", async function () {});
+
+  it("should handle multiple orders in FIFO order, allow cancelling", async function () {});
 
   it("should allow pausing", async function () {});
 });
