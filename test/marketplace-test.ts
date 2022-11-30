@@ -11,12 +11,14 @@ describe("Marketplace Tests", function () {
   let buyer: SignerWithAddress;
   let seller: SignerWithAddress;
   let royaltyReceiver: SignerWithAddress;
+  let talentirFeeReceiver: SignerWithAddress;
   const BUY = 0;
   const SELL = 1;
   const oneEther = ethers.utils.parseEther("1.0");
 
   beforeEach(async function () {
-    [owner, buyer, seller, royaltyReceiver] = await ethers.getSigners();
+    [owner, buyer, seller, royaltyReceiver, talentirFeeReceiver] =
+      await ethers.getSigners();
     const TalentirNFTFactory = await ethers.getContractFactory("TalentirNFT");
     talentirNFT = await TalentirNFTFactory.deploy();
     await talentirNFT.deployed();
@@ -55,8 +57,8 @@ describe("Marketplace Tests", function () {
     ).to.be.revertedWith("ERC1155: caller is not token owner nor approved");
     // Grant allowance and make sell order, add to orderbook
     expect(
-      talentirNFT.connect(seller).setApprovalForAll(marketplace.address, true)
-    ).to.emit(talentirNFT, "ApprovalForAll");
+      talentirNFT.setNftMarketplaceApproval(marketplace.address, true)
+    ).to.emit(talentirNFT, "MarketplaceApproved");
     await marketplace.connect(seller).makeSellOrder(tokenId, oneEther, 1, true);
     let orderID = await marketplace.getBestOrder(tokenId, SELL);
     let order = await marketplace.orders(orderID[0]);
@@ -75,9 +77,14 @@ describe("Marketplace Tests", function () {
       1
     );
     // Buyer makes a buy order with too low price, not added to order book -> nothing happens
-    await marketplace
-      .connect(buyer)
-      .makeBuyOrder(tokenId, 1, false, { value: 1 });
+    expect(
+      await marketplace
+        .connect(buyer)
+        .makeBuyOrder(tokenId, 1, false, { value: 1000 })
+    ).to.changeEtherBalances(
+      [buyer.address, marketplace.address],
+      [-oneEther, oneEther]
+    );
     orderID = await marketplace.getBestOrder(tokenId, BUY);
     order = await marketplace.orders(orderID[0]);
     expect(orderID[0]).to.equal(0);
@@ -86,24 +93,34 @@ describe("Marketplace Tests", function () {
     expect(order.price).to.equal(0);
     expect(order.quantity).to.equal(0);
     // Buyer makes a buy order with too low price, added to order book
-    await marketplace
-      .connect(buyer)
-      .makeBuyOrder(tokenId, 1, true, { value: 1 });
+    expect(
+      await marketplace
+        .connect(buyer)
+        .makeBuyOrder(tokenId, 1, true, { value: 1000 })
+    ).to.changeEtherBalances(
+      [buyer.address, marketplace.address],
+      [-1000, 1000]
+    );
     orderID = await marketplace.getBestOrder(tokenId, BUY);
     order = await marketplace.orders(orderID[0]);
     expect(orderID[0]).to.equal(2);
-    expect(orderID[1]).to.equal(1);
+    expect(orderID[1]).to.equal(1000);
     expect(order.tokenId).to.equal(tokenId);
     expect(order.side).to.equal(BUY);
     expect(order.sender).to.equal(buyer.address);
-    expect(order.price).to.equal(1);
+    expect(order.price).to.equal(1000);
     expect(order.quantity).to.equal(1);
     // Buyer makes a buy order with matching price, executes, removes order
     expect(
       await marketplace
         .connect(buyer)
         .makeBuyOrder(tokenId, 1, true, { value: oneEther })
-    ).to.emit(marketplace, "OrderExecuted");
+    )
+      .to.emit(marketplace, "OrderExecuted")
+      .to.changeEtherBalances(
+        [marketplace.address, seller.address],
+        [-oneEther, oneEther]
+      );
     orderID = await marketplace.getBestOrder(tokenId, SELL);
     order = await marketplace.orders(orderID[0]);
     expect(orderID[0]).to.equal(0);
@@ -123,12 +140,34 @@ describe("Marketplace Tests", function () {
     orderID = await marketplace.getBestOrder(tokenId, BUY);
     order = await marketplace.orders(orderID[0]);
     expect(orderID[0]).to.equal(2);
-    expect(orderID[1]).to.equal(1);
+    expect(orderID[1]).to.equal(1000);
     expect(order.tokenId).to.equal(tokenId);
     expect(order.side).to.equal(BUY);
     expect(order.sender).to.equal(buyer.address);
-    expect(order.price).to.equal(1);
+    expect(order.price).to.equal(1000);
     expect(order.quantity).to.equal(1);
+    // Create a sell order that fills the buy order
+    expect(
+      await marketplace.connect(seller).makeSellOrder(tokenId, 1000, 1, false)
+    )
+      .to.emit(marketplace, "OrderExecuted")
+      .to.changeEtherBalances(
+        [marketplace.address, seller.address],
+        [-1000, 1000]
+      );
+    // Order is removed
+    orderID = await marketplace.getBestOrder(tokenId, BUY);
+    order = await marketplace.orders(orderID[0]);
+    expect(orderID[0]).to.equal(0);
+    expect(orderID[1]).to.equal(0);
+    expect(order.side).to.equal(0);
+    expect(order.price).to.equal(0);
+    expect(order.quantity).to.equal(0);
+    // Balances are updated
+    expect(await talentirNFT.balanceOf(seller.address, tokenId)).to.equal(
+      999998
+    );
+    expect(await talentirNFT.balanceOf(buyer.address, tokenId)).to.equal(2);
   });
 
   it("should distribute fees correctly", async function () {});
