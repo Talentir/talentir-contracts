@@ -19,8 +19,6 @@ import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 /// TYPES ///
 import {Side, Order} from "./OrderTypes.sol";
 
-import "hardhat/console.sol";
-
 contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Holder {
     /// LIBRARIES ///
     using RBTLibrary for RBTLibrary.Tree;
@@ -215,10 +213,10 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         uint256 price = _ETHquantity / _tokenQuantity;
         require(_ETHquantity > 0, "Price must be positive");
         // This check prevents orders from being added if there are rounding problems:
-        require(
-            _side == Side.BUY ? price * _tokenQuantity <= _ETHquantity : price * _tokenQuantity >= _ETHquantity,
-            "Rounding problem"
-        );
+        // require(
+        //     _side == Side.BUY ? price * _tokenQuantity <= _ETHquantity : price * _tokenQuantity >= _ETHquantity,
+        //     "Rounding problem"
+        // );
         Side oppositeSide = _oppositeSide(_side);
         (bestOrderId, bestPrice) = getBestOrder(_tokenId, oppositeSide);
         // If possible, buy up to the specified price limit
