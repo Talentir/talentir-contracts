@@ -336,7 +336,57 @@ describe("Marketplace Tests", function () {
     // console.log(bestOrder);
   });
 
-  it("should cancel orders", async function () {});
+  it("should pause and cancel", async function () {
+    // Make buy orders
+    const tokenId = await talentirNFT.contentIdToTokenId("abc");
+    expect(
+      await marketplace.makeBuyOrder(tokenId, 1, true, {
+        value: oneEther,
+      })
+    )
+      .to.emit(marketplace, "OrderAdded")
+      .to.changeEtherBalances(
+        [marketplace.address, owner.address],
+        [oneEther, -oneEther]
+      );
+    // Non-owner can't pause
+    expect(marketplace.connect(seller).pause()).to.be.revertedWith(
+      "Ownable: caller is not the owner"
+    );
+    // Pause contract
+    expect(await marketplace.pause()).to.emit(marketplace, "Paused");
+    // Can't make buy or sell orders
+    expect(
+      marketplace.makeBuyOrder(tokenId, 1, true, {
+        value: oneEther,
+      })
+    ).to.be.revertedWith("Pausable: paused");
+    expect(
+      marketplace.makeSellOrder(tokenId, oneEther, 1, true)
+    ).to.be.revertedWith("Pausable: paused");
+    // Other user can't cancel order on behalf of others
+    expect(marketplace.connect(seller).cancelOrders([1])).to.be.revertedWith(
+      "Wrong user"
+    );
+    // Can still cancel order
+    expect(await marketplace.cancelOrders([1]))
+      .to.emit(marketplace, "OrderCancelled")
+      .to.changeEtherBalances(
+        [marketplace.address, owner.address],
+        [-oneEther, oneEther]
+      );
+    // Order is removed
+    let orderID = await marketplace.getBestOrder(tokenId, SELL);
+    let order = await marketplace.orders(orderID[0]);
+    expect(orderID[0]).to.equal(0);
+    expect(orderID[1]).to.equal(0);
+    expect(order.side).to.equal(0);
+    expect(order.price).to.equal(0);
+    expect(order.quantity).to.equal(0);
 
-  it("should allow pausing", async function () {});
+    order = await marketplace.orders(1);
+    expect(order.side).to.equal(0);
+    expect(order.price).to.equal(0);
+    expect(order.quantity).to.equal(0);
+  });
 });
