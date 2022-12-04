@@ -19,22 +19,7 @@ import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 /// TYPES ///
 import {Side, Order} from "./OrderTypes.sol";
 
-// done: runden
-// done: buyer fees rausnehmen, ERC2981-royalties-Kompatibilitaet ueberlegen
-// done: nur eine Fee
-// done: whitelist ODER nur ein Vertrag
-// done: ETH statt WETH
-// done: priceFactor nochmal ueberpruefen
-// done: OrderExecuted enthaelt Preis und Royalties
-// done: einzelne Events fuer cancelled orders
-// done: refactor safeTransfer functions
-// done: name TalentirMarketplaceV0
-// done: Ownable statt AccessControl
-// Security
-// Handle error in external calls
-// https://consensys.github.io/smart-contract-best-practices/development-recommendations/general/external-calls/#favor-pull-over-push-for-external-calls%5Bpull-payment%5D
-// TODO: eine withdrawal funktion fuer die balances aus failed transfers
-// TODO: Decimals Beschreibungen in den Kommentaren aktualisieren
+import "hardhat/console.sol";
 
 contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Holder {
     /// LIBRARIES ///
@@ -59,7 +44,6 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     address public talentirFeeWallet;
     uint256 public nextOrderId;
     uint256 internal constant PERCENT = 100000;
-    uint256 public roundingFactor = 1;
 
     /// EVENTS ///
     event OrderAdded(
@@ -80,7 +64,6 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         uint256 remainingQuantity
     );
     event OrderCancelled(uint256 orderId);
-    event DecimalsSet(uint32 decimals);
     event TalentirFeeSet(uint256 fee, address wallet);
 
     /// CONSTRUCTOR ///
@@ -97,7 +80,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         @dev Return the best `_side` (buy=0, sell=1) order for token `_tokenId`
         @param _tokenId token Id (ERC1155)
         @return uint256 Id of best order
-        @return uint256 price of best order (in units of 10^(27-tokenDecimals))
+        @return uint256 price of best order
      */
     function getBestOrder(uint256 _tokenId, Side _side) public view returns (uint256, uint256) {
         uint256 price = _side == Side.BUY
@@ -112,7 +95,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         @notice Computes the fee amount to be paid to Talentir for a transaction of size `_totalPaid`
         @dev Computes the fee amount to be paid for a transaction of size `_quantity`. 
         @param _totalPaid price*volume
-        @return uint256 fee (in units of 10^(27-tokenDecimals))
+        @return uint256 fee 
      */
     function calcTalentirFee(uint256 _totalPaid) public view returns (uint256) {
         return ((100 * talentirFeePercent * _totalPaid) / PERCENT) / 100;
@@ -124,12 +107,12 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         @notice Sell `tokenQuantity` of token `tokenId` for min `ETHquantity` total price. (ERC1155)
         @dev Sell `tokenQuantity` of token `tokenId` for min `ETHquantity` total price. (ERC1155)
         @dev Price limit must always be included to prevent frontrunning. 
-        @dev price will be rounded to 10^(18-roundingFactor) decimal places!
+        @dev Sender address must be able to receive Ether, otherwise funds may be lost (ony relevant if sent from a smart contract)
         @dev Does NOT work for ERC20!. 
         @dev can emit multiple OrderExecuted events. 
         @param tokenId token Id (ERC1155)
-        @param ETHquantity total WETH demanded (quantity*minimum price per unit, in units of 10^18)
-        @param tokenQuantity how much to sell in total of token (in units of 10^tokenDecimals)
+        @param ETHquantity total ETH demanded (quantity*minimum price per unit)
+        @param tokenQuantity how much to sell in total of token 
         @param addUnfilledOrderToOrderbook add order to order list at a limit price of WETHquantity/tokenQuantity if it can't be filled
      */
     function makeSellOrder(
@@ -145,13 +128,13 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         @notice Buy `tokenQuantity` of token `tokenId` for max `msg.value` total price.
         @dev Buy `tokenQuantity` of token `tokenId` for max `msg.value` total price.
         @dev Price limit must always be included to prevent frontrunning. 
-        @dev price will be rounded to 10^(18-roundingFactor) decimal places!
+        @dev Sender address must be able to receive Ether, otherwise funds may be lost (ony relevant if sent from a smart contract)
         @dev Does NOT work for ERC20!. 
         @dev can emit multiple OrderExecuted events. 
         @param tokenId token Id (ERC1155)
-        @param tokenQuantity how much to buy in total of token (in units of 10^tokenDecimals)
+        @param tokenQuantity how much to buy in total of token 
         @param addUnfilledOrderToOrderbook add order to order list at a limit price of WETHquantity/tokenQuantity if it can't be filled
-        @dev `msg.value` total ETH offered (quantity*maximum price per unit, in units of 10^18)
+        @dev `msg.value` total ETH offered (quantity*maximum price per unit)
      */
     function makeBuyOrder(
         uint256 tokenId,
@@ -206,21 +189,10 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         @param _wallet address where Talentir fee will be sent to
      */
     function setTalentirFee(uint256 _fee, address _wallet) external onlyOwner {
-        require(_fee <= PERCENT / 10, "Must be <10k"); // Talentir fee can never be higher than 10%
+        require(_fee <= PERCENT / 10, "Must be <=10k"); // Talentir fee can never be higher than 10%
         talentirFeePercent = _fee;
         talentirFeeWallet = _wallet;
         emit TalentirFeeSet(_fee, _wallet);
-    }
-
-    /**
-        @dev Set significant decimal places.
-        @dev emits DecimalsSet event. 
-        @param _decimals uint32 number of significant decimal places
-     */
-    function setDecimals(uint32 _decimals) external onlyOwner {
-        require(_decimals <= 18, "Too many digits");
-        roundingFactor = 10**(18 - _decimals);
-        emit DecimalsSet(_decimals);
     }
 
     /// INTERNAL FUNCTIONS ///
@@ -240,8 +212,9 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     ) internal {
         uint256 bestPrice;
         uint256 bestOrderId;
-        uint256 price = (_ETHquantity) / _tokenQuantity;
-        price = (price / roundingFactor) * roundingFactor;
+        uint256 price = _ETHquantity / _tokenQuantity;
+        require(_ETHquantity > 0, "Price must be positive");
+        // This check prevents orders from being added if there are rounding problems:
         require(
             _side == Side.BUY ? price * _tokenQuantity <= _ETHquantity : price * _tokenQuantity >= _ETHquantity,
             "Rounding problem"
@@ -261,7 +234,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
             } else {
                 quantityToBuy = orders[bestOrderId].quantity;
             }
-            _executeOrder(bestOrderId, quantityToBuy);
+            _ETHquantity -= _executeOrder(bestOrderId, quantityToBuy);
             remainingQuantity -= quantityToBuy;
             if (remainingQuantity > 0) {
                 (bestOrderId, bestPrice) = getBestOrder(_tokenId, oppositeSide);
@@ -271,10 +244,16 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         if (_addOrderForRemaining && (remainingQuantity > 0)) {
             _addOrder(_tokenId, _side, msg.sender, price, remainingQuantity);
         }
+        // Refund any remaining ETH from a buy order not added to order book
+        if ((_side == Side.BUY) && !(_addOrderForRemaining)) {
+            require(msg.value >= _ETHquantity, "Couldn't refund"); // just to be safe - don't refund more than what was sent
+            bool success;
+            (success, ) = msg.sender.call{value: _ETHquantity}("");
+        }
     }
 
     /// @dev Executes one atomic order (transfers tokens and removes order).
-    function _executeOrder(uint256 _orderId, uint256 _quantity) internal {
+    function _executeOrder(uint256 _orderId, uint256 _quantity) internal returns (uint256 ETHquantity) {
         if (_quantity > 0) {
             uint256 tokenId = orders[_orderId].tokenId;
             Side side = orders[_orderId].side;
@@ -286,6 +265,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
                 (price * _quantity)
             );
             uint256 talentirFee = calcTalentirFee((price * _quantity));
+            require(price * _quantity > (royaltiesAmount + talentirFee), "Problem calculating fees");
 
             if (_quantity == orders[_orderId].quantity) {
                 _removeOrder(_orderId);
@@ -293,7 +273,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
                 orders[_orderId].quantity -= _quantity;
             }
             if (side == Side.BUY) {
-                // Original order was a buy order: WETH has already been transferred into the contract
+                // Original order was a buy order: ETH has already been transferred into the contract
                 // Distribute Fees from contract
                 (success, ) = royaltiesReceiver.call{value: royaltiesAmount}("");
                 (success, ) = talentirFeeWallet.call{value: talentirFee}("");
@@ -319,6 +299,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
                 _quantity,
                 orders[_orderId].quantity
             );
+            return price * _quantity;
         }
     }
 

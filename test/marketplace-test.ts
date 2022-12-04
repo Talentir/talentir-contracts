@@ -59,7 +59,11 @@ describe("Marketplace Tests", function () {
     expect(
       talentirNFT.setNftMarketplaceApproval(marketplace.address, true)
     ).to.emit(talentirNFT, "MarketplaceApproved");
-    await marketplace.connect(seller).makeSellOrder(tokenId, oneEther, 1, true);
+    expect(
+      await marketplace
+        .connect(seller)
+        .makeSellOrder(tokenId, oneEther, 1, true)
+    ).to.emit(marketplace, "OrderAdded");
     let orderID = await marketplace.getBestOrder(tokenId, SELL);
     let order = await marketplace.orders(orderID[0]);
     expect(orderID[0]).to.equal(1);
@@ -110,11 +114,11 @@ describe("Marketplace Tests", function () {
     expect(order.sender).to.equal(buyer.address);
     expect(order.price).to.equal(1000);
     expect(order.quantity).to.equal(1);
-    // Buyer makes a buy order with matching price, executes, removes order
+    // Buyer makes a buy order with higher price than asked, executes, removes executed order and refunds the excess Ether
     expect(
       await marketplace
         .connect(buyer)
-        .makeBuyOrder(tokenId, 1, true, { value: oneEther })
+        .makeBuyOrder(tokenId, 1, false, { value: oneEther.mul(2) })
     )
       .to.emit(marketplace, "OrderExecuted")
       .to.changeEtherBalances(
@@ -170,11 +174,169 @@ describe("Marketplace Tests", function () {
     expect(await talentirNFT.balanceOf(buyer.address, tokenId)).to.equal(2);
   });
 
-  it("should distribute fees correctly", async function () {});
+  it("should distribute fees correctly", async function () {
+    // Grant marketplace approval
+    expect(
+      talentirNFT.setNftMarketplaceApproval(marketplace.address, true)
+    ).to.emit(talentirNFT, "MarketplaceApproved");
+    // Mint token to seller
+    await talentirNFT.mint(
+      seller.address,
+      "abcd",
+      "abc",
+      royaltyReceiver.address
+    );
+    const tokenId = await talentirNFT.contentIdToTokenId("abc");
+    expect(await talentirNFT.balanceOf(seller.address, tokenId)).to.equal(
+      1000000
+    );
+    // Non-owner can't set fees
+    expect(
+      marketplace.connect(buyer).setTalentirFee(1, talentirFeeReceiver.address)
+    ).to.be.revertedWith("Ownable: caller is not the owner");
+    expect(talentirNFT.connect(buyer).setRoyalty(1)).to.be.revertedWith(
+      "Ownable: caller is not the owner"
+    );
+    // Can't set too high fees
+    expect(
+      marketplace.setTalentirFee(10001, talentirFeeReceiver.address)
+    ).to.be.revertedWith("Must be <=10k");
+    expect(
+      marketplace.setTalentirFee(101, talentirFeeReceiver.address)
+    ).to.be.revertedWith("Must be <=100");
+    // Set fees
+    expect(
+      await marketplace.setTalentirFee(10000, talentirFeeReceiver.address)
+    ).to.emit(marketplace, "TalentirFeeSet");
+    expect(await talentirNFT.setRoyalty(100)).to.emit(
+      talentirNFT,
+      "RoyaltyPercentageChanged"
+    );
+    expect(await talentirNFT.setRoyalty(50)).to.emit(
+      talentirNFT,
+      "RoyaltyPercentageChanged"
+    );
+    // Non-royalty-receiver can't update royalties
+    expect(
+      talentirNFT.updateTalent(tokenId, seller.address)
+    ).to.be.revertedWith("Royalty receiver must update");
+    // Royalty-receiver can update royalties
+    expect(
+      await talentirNFT
+        .connect(royaltyReceiver)
+        .updateTalent(tokenId, seller.address)
+    ).to.emit(talentirNFT, "TalentChange");
+    expect(
+      await talentirNFT
+        .connect(seller)
+        .updateTalent(tokenId, royaltyReceiver.address)
+    ).to.emit(talentirNFT, "TalentChange");
+    // Execute order, check that fees are distributed
+    expect(
+      await marketplace.connect(seller).makeSellOrder(tokenId, 1000, 1, true)
+    ).to.emit(marketplace, "OrderAdded");
+    expect(
+      await marketplace
+        .connect(buyer)
+        .makeBuyOrder(tokenId, 1, true, { value: 1000 })
+    )
+      .to.emit(marketplace, "OrderExecuted")
+      .to.changeEtherBalances(
+        [
+          buyer.address,
+          seller.address,
+          talentirFeeReceiver.address,
+          royaltyReceiver.address,
+        ],
+        [-1000, 850, 100, 50]
+      );
+  });
 
-  it("should handle rounding correctly", async function () {});
+  it("should handle multiple orders", async function () {
+    // Mint token to seller
+    await talentirNFT.mint(
+      seller.address,
+      "abcd",
+      "abc",
+      royaltyReceiver.address
+    );
+    const tokenId = await talentirNFT.contentIdToTokenId("abc");
+    expect(await talentirNFT.balanceOf(seller.address, tokenId)).to.equal(
+      1000000
+    );
+    // Grant allowance
+    expect(
+      talentirNFT.setNftMarketplaceApproval(marketplace.address, true)
+    ).to.emit(talentirNFT, "MarketplaceApproved");
+    // Add multiple buy and sell orders
+    for (let i = 5; i <= 10; i++) {
+      expect(
+        await marketplace
+          .connect(seller)
+          .makeSellOrder(
+            tokenId,
+            oneEther.mul(i).add(oneEther.mul(10)),
+            2,
+            true
+          )
+      ).to.emit(marketplace, "OrderAdded");
+      expect(
+        await marketplace
+          .connect(buyer)
+          .makeBuyOrder(tokenId, 2, true, { value: oneEther.mul(i) })
+      )
+        .to.emit(marketplace, "OrderAdded")
+        .to.changeEtherBalances(
+          [marketplace.address, buyer.address],
+          [oneEther.mul(i), -oneEther.mul(i)]
+        );
+    }
+    // Add another order at the best price
+    expect(
+      await marketplace.makeBuyOrder(tokenId, 2, true, {
+        value: oneEther.mul(10),
+      })
+    )
+      .to.emit(marketplace, "OrderAdded")
+      .to.changeEtherBalances(
+        [marketplace.address, owner.address],
+        [oneEther.mul(10), -oneEther.mul(10)]
+      );
+    // Check FIFO: best order should be the one added first, and that one shuld be executed
+    let bestOrderId = await marketplace.getBestOrder(tokenId, BUY);
+    let bestOrder = await marketplace.orders(bestOrderId[0]);
+    expect(bestOrder.sender).to.equal(buyer.address);
+    expect(
+      await marketplace
+        .connect(seller)
+        .makeSellOrder(tokenId, oneEther.mul(10), 2, true)
+    )
+      .to.emit(marketplace, "OrderExecuted")
+      .to.changeEtherBalances(
+        [marketplace.address, seller.address],
+        [-oneEther.mul(10), oneEther.mul(10)]
+      );
+    // New best order is the second one
+    bestOrderId = await marketplace.getBestOrder(tokenId, BUY);
+    bestOrder = await marketplace.orders(bestOrderId[0]);
+    expect(bestOrder.sender).to.equal(owner.address);
+    // Partially fill the buy orders
+    // expect(
+    //   await marketplace
+    //     .connect(seller)
+    //     .makeSellOrder(tokenId, oneEther, 1, false)
+    // )
+    //   .to.emit(marketplace, "OrderExecuted")
+    //   .to.changeEtherBalances(
+    //     [marketplace.address, seller.address],
+    //     [-oneEther.mul(25), oneEther.mul(25)]
+    //   );
+    // bestOrderId = await marketplace.getBestOrder(tokenId, BUY);
+    // bestOrder = await marketplace.orders(bestOrderId[0]);
+    // console.log(bestOrder);
+  });
 
-  it("should handle multiple orders in FIFO order, allow cancelling", async function () {});
+  it("should cancel orders", async function () {});
 
   it("should allow pausing", async function () {});
 });

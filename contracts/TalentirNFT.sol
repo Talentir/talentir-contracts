@@ -38,6 +38,7 @@ contract TalentirNFT is ERC1155(""), ERC2981, Ownable, Pausable {
      * future.
      */
     function setRoyalty(uint16 permill) public onlyOwner {
+        require(permill <= 100, "Must be <=100"); // Royalty can never be higher than 10%
         _setRoyaltyPermill(permill);
     }
 
