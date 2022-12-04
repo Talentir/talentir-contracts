@@ -329,10 +329,11 @@ describe("Marketplace Tests", function () {
     //   .to.emit(marketplace, "OrderExecuted")
     //   .to.changeEtherBalances(
     //     [marketplace.address, seller.address],
-    //     [-oneEther.mul(25), oneEther.mul(25)]
+    //     [-oneEther, oneEther]
     //   );
     // bestOrderId = await marketplace.getBestOrder(tokenId, BUY);
     // bestOrder = await marketplace.orders(bestOrderId[0]);
+    // expect(await bestOrder.quantity).to.equal(0);
     // console.log(bestOrder);
   });
 
