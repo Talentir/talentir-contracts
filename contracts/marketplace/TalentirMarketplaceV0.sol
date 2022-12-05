@@ -266,41 +266,49 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
                 tokenId,
                 (price * _quantity)
             );
-            uint256 talentirFee = calcTalentirFee((price * _quantity));
-            require(price * _quantity > (royaltiesAmount + talentirFee), "Problem calculating fees");
 
-            if (_quantity == orders[_orderId].quantity) {
-                _removeOrder(_orderId);
-            } else {
-                orders[_orderId].quantity -= _quantity;
+            {
+                uint256 talentirFee = calcTalentirFee((price * _quantity));
+                require(price * _quantity > (royaltiesAmount + talentirFee), "Problem calculating fees");
+
+                
+                if (_quantity == orders[_orderId].quantity) {
+                    _removeOrder(_orderId);
+                } else {
+                    orders[_orderId].quantity -= _quantity;
+                }
+                if (side == Side.BUY) {
+                    // Original order was a buy order: ETH has already been transferred into the contract
+                    // Distribute Fees from contract
+                    (success, ) = royaltiesReceiver.call{value: royaltiesAmount}("");
+                    (success, ) = talentirFeeWallet.call{value: talentirFee}("");
+                    // Caller is the seller - distribute to buyer first
+                    _safeTransferFrom(TalentirNFT, tokenId, msg.sender, sender, _quantity);
+                    // Seller receives price*quantity - fees
+                    (success, ) = msg.sender.call{value: (price * _quantity) - royaltiesAmount - talentirFee}("");
+                } else {
+                    // Original order was a sell order: NFT has already been transferred into the contract
+                    // Distribute Fees
+                    (success, ) = royaltiesReceiver.call{value: royaltiesAmount}("");
+                    (success, ) = talentirFeeWallet.call{value: talentirFee}("");
+                    // Caller is the buyer - distribute to seller first
+                    (success, ) = msg.sender.call{value: (price * _quantity) - royaltiesAmount - talentirFee}("");
+                    _safeTransferFrom(TalentirNFT, tokenId, address(this), msg.sender, _quantity);
+                }
             }
-            if (side == Side.BUY) {
-                // Original order was a buy order: ETH has already been transferred into the contract
-                // Distribute Fees from contract
-                (success, ) = royaltiesReceiver.call{value: royaltiesAmount}("");
-                (success, ) = talentirFeeWallet.call{value: talentirFee}("");
-                // Caller is the seller - distribute to buyer first
-                _safeTransferFrom(TalentirNFT, tokenId, msg.sender, sender, _quantity);
-                // Seller receives price*quantity - fees
-                (success, ) = msg.sender.call{value: (price * _quantity) - royaltiesAmount - talentirFee}("");
-            } else {
-                // Original order was a sell order: NFT has already been transferred into the contract
-                // Distribute Fees
-                (success, ) = royaltiesReceiver.call{value: royaltiesAmount}("");
-                (success, ) = talentirFeeWallet.call{value: talentirFee}("");
-                // Caller is the buyer - distribute to seller first
-                (success, ) = msg.sender.call{value: (price * _quantity) - royaltiesAmount - talentirFee}("");
-                _safeTransferFrom(TalentirNFT, tokenId, address(this), msg.sender, _quantity);
+                {
+                    uint256 remainingQuantity = orders[_orderId].quantity;
+                    emit OrderExecuted(
+                    _orderId,
+                    msg.sender,
+                    price,
+                    royaltiesAmount,
+                    royaltiesReceiver,
+                    _quantity,
+                    remainingQuantity
+                );
             }
-            emit OrderExecuted(
-                _orderId,
-                msg.sender,
-                price,
-                royaltiesAmount,
-                royaltiesReceiver,
-                _quantity,
-                orders[_orderId].quantity
-            );
+            
             return price * _quantity;
         }
     }
