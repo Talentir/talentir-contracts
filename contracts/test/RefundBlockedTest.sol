@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
-import "../TalentirMarketplace.sol";
-
 contract RefundBlockedTest {
     bool public shouldRevert = false;
 
@@ -20,7 +18,7 @@ contract RefundBlockedTest {
         uint256 tokenID,
         uint256 price
     ) public {
-        TalentirMarketplace(marketplace).makeBuyOffer{value: price}(nftAddress, tokenID);
+        // TalentirMarketplace(marketplace).makeBuyOffer{value: price}(nftAddress, tokenID);
     }
 
     function withdrawBuyOffer(
@@ -28,6 +26,6 @@ contract RefundBlockedTest {
         address nftAddress,
         uint256 tokenID
     ) public {
-        TalentirMarketplace(marketplace).withdrawBuyOffer(nftAddress, tokenID);
+        // TalentirMarketplace(marketplace).withdrawBuyOffer(nftAddress, tokenID);
     }
 }

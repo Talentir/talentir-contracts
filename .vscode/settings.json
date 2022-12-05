@@ -9,5 +9,4 @@
     "**/node_modules": false
   },
   "standard.treatErrorsAsWarnings": true,
-  "solidity.defaultCompiler": "localFile"
 }

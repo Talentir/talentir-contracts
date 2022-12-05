@@ -16,6 +16,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 
+import "hardhat/console.sol";
+
 /// TYPES ///
 import {Side, Order} from "./OrderTypes.sol";
 
@@ -232,7 +234,9 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
             } else {
                 quantityToBuy = orders[bestOrderId].quantity;
             }
-            _ETHquantity -= _executeOrder(bestOrderId, quantityToBuy);
+            uint256 debugVariable = _executeOrder(bestOrderId, quantityToBuy);
+            console.log("ERROR", _ETHquantity, debugVariable);
+            _ETHquantity -= debugVariable; // Underflow here
             remainingQuantity -= quantityToBuy;
             if (remainingQuantity > 0) {
                 (bestOrderId, bestPrice) = getBestOrder(_tokenId, oppositeSide);

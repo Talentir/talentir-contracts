@@ -322,9 +322,9 @@ describe("Marketplace Tests", function () {
     expect(bestOrder.sender).to.equal(owner.address);
     // Partially fill the buy orders
     // expect(
-    //   await marketplace
-    //     .connect(seller)
-    //     .makeSellOrder(tokenId, oneEther, 1, false)
+      await marketplace
+        .connect(seller)
+        .makeSellOrder(tokenId, oneEther, 1, false)
     // )
     //   .to.emit(marketplace, "OrderExecuted")
     //   .to.changeEtherBalances(
