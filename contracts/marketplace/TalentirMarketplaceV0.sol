@@ -271,7 +271,6 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
                 uint256 talentirFee = calcTalentirFee((price * _quantity));
                 require(price * _quantity > (royaltiesAmount + talentirFee), "Problem calculating fees");
 
-                
                 if (_quantity == orders[_orderId].quantity) {
                     _removeOrder(_orderId);
                 } else {
@@ -296,9 +295,9 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
                     _safeTransferFrom(TalentirNFT, tokenId, address(this), msg.sender, _quantity);
                 }
             }
-                {
-                    uint256 remainingQuantity = orders[_orderId].quantity;
-                    emit OrderExecuted(
+            {
+                uint256 remainingQuantity = orders[_orderId].quantity;
+                emit OrderExecuted(
                     _orderId,
                     msg.sender,
                     price,
@@ -308,19 +307,13 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
                     remainingQuantity
                 );
             }
-            
+
             return price * _quantity;
         }
     }
 
     /// @dev Add order to all data structures.
-    function _addOrder(
-        uint256 _tokenId,
-        Side _side,
-        address _sender,
-        uint256 _price,
-        uint256 _quantity
-    ) internal {
+    function _addOrder(uint256 _tokenId, Side _side, address _sender, uint256 _price, uint256 _quantity) internal {
         // Transfer tokens to this contract
         if (_side == Side.SELL) {
             _safeTransferFrom(TalentirNFT, _tokenId, _sender, address(this), _quantity);

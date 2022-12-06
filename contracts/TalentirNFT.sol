@@ -78,14 +78,10 @@ contract TalentirNFT is ERC1155(""), ERC2981, Ownable, Pausable {
         _setTalent(tokenId, royaltyReceiver);
     }
 
-/**
- * @notice Burn a token. This is only possible for the owner of the token.
- */
-    function burn(
-        address account,
-        uint256 tokenID,
-        uint256 value
-    ) public virtual onlyOwner {
+    /**
+     * @notice Burn a token. This is only possible for the owner of the token.
+     */
+    function burn(address account, uint256 tokenID, uint256 value) public virtual onlyOwner {
         _burn(account, tokenID, value);
     }
 

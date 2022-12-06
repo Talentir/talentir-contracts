@@ -88,17 +88,10 @@ library RBTLibrary {
         return EMPTY;
     }
 
-    function getNode(Tree storage self, uint256 key)
-        internal
-        view
-        returns (
-            uint256 _returnKey,
-            uint256 _parent,
-            uint256 _left,
-            uint256 _right,
-            bool _red
-        )
-    {
+    function getNode(
+        Tree storage self,
+        uint256 key
+    ) internal view returns (uint256 _returnKey, uint256 _parent, uint256 _left, uint256 _right, bool _red) {
         require(exists(self, key), "Not found");
         return (key, self.nodes[key].parent, self.nodes[key].left, self.nodes[key].right, self.nodes[key].red);
     }
@@ -268,11 +261,7 @@ library RBTLibrary {
         self.nodes[self.root].red = false;
     }
 
-    function replaceParent(
-        Tree storage self,
-        uint256 a,
-        uint256 b
-    ) private {
+    function replaceParent(Tree storage self, uint256 a, uint256 b) private {
         uint256 bParent = self.nodes[b].parent;
         self.nodes[a].parent = bParent;
         if (bParent == EMPTY) {
