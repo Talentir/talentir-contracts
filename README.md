@@ -1,8 +1,8 @@
 # Talentir Smart Contracts
 
-## 1. NFT Contract Spec
+## 1. Token Contract Spec
 ### Standard
-The NFT Contract adheres to the following standards:
+The Token Contract adheres to the following standards:
 
 - [ERC-1155](https://eips.ethereum.org/EIPS/eip-1155)
 
