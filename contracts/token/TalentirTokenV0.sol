@@ -25,12 +25,13 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, Ownable, Pausable {
      * @notice Pauses the transfer, minting and burning of Tokens. This is a security measure and
      * allows disabling the contract when migrating to a new version.
      */
-    function pause(bool shouldPause) public onlyOwner {
-        if (shouldPause) {
-            _pause();
-        } else {
-            _unpause();
-        }
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// @dev Unpause contract.
+    function unpause() external onlyOwner {
+        _unpause();
     }
 
     /**

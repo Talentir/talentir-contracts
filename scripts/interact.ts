@@ -1,24 +1,19 @@
 import { ethers } from 'hardhat'
-
-import { TalentirNFT__factory } from '../deployments/TalentirNFT/goerli/1/types'
-import talentirNFTData from '../deployments/TalentirNFT/goerli/1/data.json'
-
-// import { TalentirMarketplace__factory } from '../deployments/TalentirMarketplace/rinkeby/0/types'
-// import talentirMarketplaceData from '../deployments/TalentirMarketplace/rinkeby/0/data.json'
+import { TalentirMarketplaceV0__factory, TalentirTokenV0__factory } from '../typechain-types'
 
 async function main (): Promise<void> {
+  const tokenAddress = "0x7C99cAD32B8dd40a4a7eCCcc18640E170cC3Bd53";
+  const marketplaceAddress = "0xA3C7c50976F017fE58F956228b67FF8026764A66"
+
   const signer = await ethers.getSigners()
-  const talentirNFTFactory = new TalentirNFT__factory(signer[0])
-  const talentirNFT = talentirNFTFactory.attach(talentirNFTData.address)
+  const talentirNFTFactory = new TalentirTokenV0__factory(signer[0]);
+  const talentirNFT = talentirNFTFactory.attach(tokenAddress)
 
-  // const talentirMarketplaceFactory = new TalentirMarketplace__factory(signer[0])
-  // const talentirMarketplace = talentirMarketplaceFactory.attach(talentirMarketplaceData.address)
+  const talentirMarketplaceFactory = new TalentirMarketplaceV0__factory(signer[0])
+  const talentirMarketplace = talentirMarketplaceFactory.attach(marketplaceAddress)
 
-  // const tx1 = await talentirNFT.setNftMarketplaceApproval(talentirMarketplaceData.address, true)
-  // console.log('TalentirNFT: Approved marketplace: ', talentirMarketplaceData.address, ' tx:', tx1.hash)
-
-  // const tx2 = await talentirMarketplace.setNftContractApproval(talentirNFTData.address, true)
-  // console.log('TalentirMarketplace: Approved NFT: ', talentirNFTData.address, ' tx:', tx2.hash)
+  const tx1 = await talentirNFT.setNftMarketplaceApproval(marketplaceAddress, true)
+  console.log('TalentirNFT: Approved marketplace: ', marketplaceAddress, ' tx:', tx1.hash)
 
   // Grant the Openzeppelin Relay the Minter Role
   const relayAddres = '0x79e08374a52c6e917c7b4808559b17a9f606d9b0'

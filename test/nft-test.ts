@@ -152,8 +152,8 @@ describe('TalentirNFT', function () {
 
     await talentir.connect(minter).mint(johnny.address, cid1, contentID1, ethers.constants.AddressZero)
 
-    expect(talentir.connect(minter).pause(true)).to.be.revertedWith('Ownable: caller is not the owner')
-    await talentir.pause(true)
+    expect(talentir.connect(minter).pause()).to.be.revertedWith('Ownable: caller is not the owner')
+    await talentir.pause()
 
     // Mint should fail
     await expect(talentir.connect(minter).mint(johnny.address, cid2, contentID2, ethers.constants.AddressZero))
@@ -167,7 +167,7 @@ describe('TalentirNFT', function () {
     await expect(talentir.burn(johnny.address, tokenID1, 1))
       .to.be.revertedWith('Pausable: paused')
 
-    await talentir.pause(false)
+    await talentir.unpause()
 
     //   // Mint should now work
     await expect(talentir.connect(minter).mint(luki.address, cid2, contentID2, ethers.constants.AddressZero))
