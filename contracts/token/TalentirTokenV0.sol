@@ -5,10 +5,10 @@ import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-import "./utils/ERC2981.sol";
+import "./../utils/ERC2981.sol";
 
 /// @custom:security-contact office@talentir.com
-contract TalentirNFT is ERC1155(""), ERC2981, Ownable, Pausable {
+contract TalentirTokenV0 is ERC1155(""), ERC2981, Ownable, Pausable {
     // - MEMBERS
     mapping(address => bool) public approvedMarketplaces;
     mapping(uint256 => string) private _tokenCIDs; // storing the IPFS CIDs

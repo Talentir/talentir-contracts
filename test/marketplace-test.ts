@@ -2,10 +2,10 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
 // eslint-disable-next-line
-import { TalentirNFT, TalentirMarketplaceV0 } from "../typechain-types";
+import { TalentirTokenV0, TalentirMarketplaceV0 } from "../typechain-types";
 
 describe('Marketplace Tests', function () {
-  let talentirNFT: TalentirNFT
+  let talentirNFT: TalentirTokenV0
   let marketplace: TalentirMarketplaceV0
   let owner: SignerWithAddress
   let buyer: SignerWithAddress
@@ -19,7 +19,7 @@ describe('Marketplace Tests', function () {
   beforeEach(async function () {
     [owner, buyer, seller, royaltyReceiver, talentirFeeReceiver] =
       await ethers.getSigners()
-    const TalentirNFTFactory = await ethers.getContractFactory('TalentirNFT')
+    const TalentirNFTFactory = await ethers.getContractFactory('TalentirTokenV0')
     talentirNFT = await TalentirNFTFactory.deploy()
     await talentirNFT.deployed()
     const MarketplaceFactory = await ethers.getContractFactory(

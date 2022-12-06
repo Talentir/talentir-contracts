@@ -4,7 +4,7 @@ import { BytesLike } from 'ethers'
 import { ethers } from 'hardhat'
 
 // eslint-disable-next-line
-import { TalentirNFT } from "../typechain-types";
+import { TalentirTokenV0 } from "../typechain-types";
 
 // Reference : https://ethereum-waffle.readthedocs.io/en/latest/matchers.html
 describe('TalentirNFT', function () {
@@ -12,10 +12,10 @@ describe('TalentirNFT', function () {
   let minter: SignerWithAddress
   let luki: SignerWithAddress
   let johnny: SignerWithAddress
-  let talentir: TalentirNFT
+  let talentir: TalentirTokenV0
 
   beforeEach(async function () {
-    const Talentir = await ethers.getContractFactory('TalentirNFT')
+    const Talentir = await ethers.getContractFactory('TalentirTokenV0')
     talentir = await Talentir.deploy()
     await talentir.deployed();
 
