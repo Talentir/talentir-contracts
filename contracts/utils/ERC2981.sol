@@ -7,12 +7,12 @@ import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 /// @custom:security-contact security@talentir.com
 contract ERC2981 is ERC165, IERC2981 {
     mapping(uint256 => address) internal _talents;
-    uint256 private _royaltyPermill = 100;
+    uint256 private _royaltyPercent= 10_000;
 
     // - EVENTS
-    event RoyaltyPercentageChanged(uint256 permill);
+    event RoyaltyPercentageChanged(uint256 percent);
 
-    event TalentChange(address from, address to, uint256 tokenID);
+    event TalentChanged(address from, address to, uint256 tokenID);
 
     function royaltyInfo(uint256 tokenId, uint256 value)
         public
@@ -22,7 +22,7 @@ contract ERC2981 is ERC165, IERC2981 {
     {
         require(_talents[tokenId] != address(0), "No royalty info for address");
         receiver = _talents[tokenId];
-        royaltyAmount = (value * _royaltyPermill) / 1000;
+        royaltyAmount = (value * _royaltyPercent) / 100_000;
     }
 
     function updateTalent(uint256 tokenId, address talent) public {
@@ -38,12 +38,11 @@ contract ERC2981 is ERC165, IERC2981 {
     function _setTalent(uint256 tokenID, address talent) internal {
         address from = _talents[tokenID];
         _talents[tokenID] = talent;
-        emit TalentChange(from, talent, tokenID);
+        emit TalentChanged(from, talent, tokenID);
     }
 
-    function _setRoyaltyPermill(uint256 permill) internal {
-        // TODO: Range check
-        emit RoyaltyPercentageChanged(permill);
-        _royaltyPermill = permill;
+    function _setRoyaltyPercent(uint256 percent) internal {
+        emit RoyaltyPercentageChanged(percent);
+        _royaltyPercent = percent;
     }
 }

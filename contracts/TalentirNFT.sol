@@ -34,12 +34,11 @@ contract TalentirNFT is ERC1155(""), ERC2981, Ownable, Pausable {
     }
 
     /**
-     * @notice Changing the royalty percentage of every sale. Should be handled by the DAO in the
-     * future.
+     * @notice Changing the royalty percentage of every sale. 1% = 1_000
      */
-    function setRoyalty(uint16 permill) public onlyOwner {
-        require(permill <= 100, "Must be <=100"); // Royalty can never be higher than 10%
-        _setRoyaltyPermill(permill);
+    function setRoyalty(uint256 percent) public onlyOwner {
+        require(percent <= 100_000, "Must be <= 100%");
+        _setRoyaltyPercent(percent);
     }
 
     function setMinterRole(address minterAddress) public onlyOwner {
@@ -77,6 +76,17 @@ contract TalentirNFT is ERC1155(""), ERC2981, Ownable, Pausable {
         _mint(to, tokenId, 1000000, "");
         _tokenCIDs[tokenId] = cid;
         _setTalent(tokenId, royaltyReceiver);
+    }
+
+/**
+ * @notice Burn a token. This is only possible for the owner of the token.
+ */
+    function burn(
+        address account,
+        uint256 tokenID,
+        uint256 value
+    ) public virtual onlyOwner {
+        _burn(account, tokenID, value);
     }
 
     function uri(uint256 tokenId) public view override returns (string memory) {
