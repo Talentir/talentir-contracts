@@ -18,7 +18,7 @@ export function deploymentPath (contractName: string): string {
   return path
 }
 
-export async function verifyEtherscan (address: string, deployResponse: TransactionResponse): Promise<void> {
+export async function verifyEtherscan (address: string, deployResponse: TransactionResponse, params?: string[]): Promise<void> {
   if (hre.network.name === 'localhost' || hre.network.name === 'hahrdhat') {
     return
   }
@@ -26,7 +26,7 @@ export async function verifyEtherscan (address: string, deployResponse: Transact
   try {
     console.log('Waiting for 5 confirmations...')
     await deployResponse.wait(5)
-    await hre.run('verify:verify', { address })
+    await hre.run('verify:verify', {address, constructorArguments: params})
     console.log('Verified on Etherscan!')
   } catch (error) {
     console.log('Couldnt verify on Etherscan:\n', error)
