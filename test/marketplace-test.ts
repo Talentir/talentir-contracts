@@ -14,7 +14,7 @@ describe('Marketplace Tests', function () {
   let talentirFeeReceiver: SignerWithAddress
   const BUY = 0
   const SELL = 1
-  const oneEther = ethers.utils.parseEther('0.0000000001')
+  const oneEther = ethers.utils.parseEther('0.0000000001') // full Ether causes overflow in etherBalanceToChange function
 
   beforeEach(async function () {
     [owner, buyer, seller, royaltyReceiver, talentirFeeReceiver] =
@@ -272,7 +272,7 @@ describe('Marketplace Tests', function () {
   })
 
   it('should handle multiple orders', async function () {
-    // Set royalties to 0 (will be tested later)
+    // Set royalties to 0 (tested separately)
     await expect(talentirNFT.setRoyalty(0)).to.emit(
       talentirNFT,
       'RoyaltyPercentageChanged'
