@@ -117,7 +117,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         uint256 ETHquantity,
         uint256 tokenQuantity,
         bool addUnfilledOrderToOrderbook
-    ) external whenNotPaused {
+    ) external whenNotPaused nonReentrant {
         _makeOrder(tokenId, Side.SELL, ETHquantity, tokenQuantity, addUnfilledOrderToOrderbook);
     }
 
@@ -137,7 +137,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         uint256 tokenId,
         uint256 tokenQuantity,
         bool addUnfilledOrderToOrderbook
-    ) external payable whenNotPaused {
+    ) external payable whenNotPaused nonReentrant {
         _makeOrder(tokenId, Side.BUY, msg.value, tokenQuantity, addUnfilledOrderToOrderbook);
     }
 
@@ -199,7 +199,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         return Side(1 - uint8(_side));
     }
 
-    /// @dev Make a limit order. Internally, all orders are limit orders to prevent front running.
+    /// @dev Make a limit order. Internally, all orders are limit orders to prevent frontrunning.
     function _makeOrder(
         uint256 _tokenId,
         Side _side,
@@ -207,11 +207,13 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         uint256 _tokenQuantity,
         bool _addOrderForRemaining
     ) internal {
+        require(_ETHquantity > 0, "Price must be positive");
+        require(_tokenQuantity > 0, "Token quantity must be positive");
+        uint256 price = _ETHquantity / _tokenQuantity;
+        require(price > 0, "Rounding problem");
         uint256 bestPrice;
         uint256 bestOrderId;
-        uint256 price = _ETHquantity / _tokenQuantity;
         uint256 ETHquantityExecuted;
-        require(_ETHquantity > 0, "Price must be positive");
         Side oppositeSide = _oppositeSide(_side);
         (bestOrderId, bestPrice) = getBestOrder(_tokenId, oppositeSide);
         // If possible, buy up to the specified price limit
@@ -250,60 +252,58 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
 
     /// @dev Executes one atomic order (transfers tokens and removes order).
     function _executeOrder(uint256 _orderId, uint256 _quantity) internal returns (uint256 ETHquantity) {
-        if (_quantity > 0) {
-            uint256 tokenId = orders[_orderId].tokenId;
-            Side side = orders[_orderId].side;
-            uint256 price = orders[_orderId].price;
-            address sender = orders[_orderId].sender;
-            bool success;
-            (address royaltiesReceiver, uint256 royaltiesAmount) = IERC2981(TalentirNFT).royaltyInfo(
-                tokenId,
-                (price * _quantity)
-            );
+        uint256 tokenId = orders[_orderId].tokenId;
+        Side side = orders[_orderId].side;
+        uint256 price = orders[_orderId].price;
+        address sender = orders[_orderId].sender;
+        bool success;
+        (address royaltiesReceiver, uint256 royaltiesAmount) = IERC2981(TalentirNFT).royaltyInfo(
+            tokenId,
+            (price * _quantity)
+        );
 
-            {
-                uint256 talentirFee = calcTalentirFee((price * _quantity));
-                require(price * _quantity > (royaltiesAmount + talentirFee), "Problem calculating fees");
+        {
+            uint256 talentirFee = calcTalentirFee((price * _quantity));
+            require(price * _quantity > (royaltiesAmount + talentirFee), "Problem calculating fees");
 
-                if (_quantity == orders[_orderId].quantity) {
-                    _removeOrder(_orderId);
-                } else {
-                    orders[_orderId].quantity -= _quantity;
-                }
-                if (side == Side.BUY) {
-                    // Original order was a buy order: ETH has already been transferred into the contract
-                    // Distribute Fees from contract
-                    (success, ) = royaltiesReceiver.call{value: royaltiesAmount}("");
-                    (success, ) = talentirFeeWallet.call{value: talentirFee}("");
-                    // Caller is the seller - distribute to buyer first
-                    _safeTransferFrom(TalentirNFT, tokenId, msg.sender, sender, _quantity);
-                    // Seller receives price*quantity - fees
-                    (success, ) = msg.sender.call{value: (price * _quantity) - royaltiesAmount - talentirFee}("");
-                } else {
-                    // Original order was a sell order: NFT has already been transferred into the contract
-                    // Distribute Fees
-                    (success, ) = royaltiesReceiver.call{value: royaltiesAmount}("");
-                    (success, ) = talentirFeeWallet.call{value: talentirFee}("");
-                    // Caller is the buyer - distribute to seller first
-                    (success, ) = msg.sender.call{value: (price * _quantity) - royaltiesAmount - talentirFee}("");
-                    _safeTransferFrom(TalentirNFT, tokenId, address(this), msg.sender, _quantity);
-                }
+            if (_quantity == orders[_orderId].quantity) {
+                _removeOrder(_orderId);
+            } else {
+                orders[_orderId].quantity -= _quantity;
             }
-            {
-                uint256 remainingQuantity = orders[_orderId].quantity;
-                emit OrderExecuted(
-                    _orderId,
-                    msg.sender,
-                    price,
-                    royaltiesAmount,
-                    royaltiesReceiver,
-                    _quantity,
-                    remainingQuantity
-                );
+            if (side == Side.BUY) {
+                // Original order was a buy order: ETH has already been transferred into the contract
+                // Distribute Fees from contract
+                (success, ) = royaltiesReceiver.call{value: royaltiesAmount}("");
+                (success, ) = talentirFeeWallet.call{value: talentirFee}("");
+                // Caller is the seller - distribute to buyer first
+                _safeTransferFrom(TalentirNFT, tokenId, msg.sender, sender, _quantity);
+                // Seller receives price*quantity - fees
+                (success, ) = msg.sender.call{value: (price * _quantity) - royaltiesAmount - talentirFee}("");
+            } else {
+                // Original order was a sell order: NFT has already been transferred into the contract
+                // Distribute Fees
+                (success, ) = royaltiesReceiver.call{value: royaltiesAmount}("");
+                (success, ) = talentirFeeWallet.call{value: talentirFee}("");
+                // Caller is the buyer - distribute to seller first
+                (success, ) = sender.call{value: (price * _quantity) - royaltiesAmount - talentirFee}("");
+                _safeTransferFrom(TalentirNFT, tokenId, address(this), msg.sender, _quantity);
             }
-
-            return price * _quantity;
         }
+        {
+            uint256 remainingQuantity = orders[_orderId].quantity;
+            emit OrderExecuted(
+                _orderId,
+                msg.sender,
+                price,
+                royaltiesAmount,
+                royaltiesReceiver,
+                _quantity,
+                remainingQuantity
+            );
+        }
+
+        return price * _quantity;
     }
 
     /// @dev Add order to all data structures.

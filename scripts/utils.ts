@@ -26,7 +26,7 @@ export async function verifyEtherscan (address: string, deployResponse: Transact
   try {
     console.log('Waiting for 5 confirmations...')
     await deployResponse.wait(5)
-    await hre.run('verify:verify', {address, constructorArguments: params})
+    await hre.run('verify:verify', { address, constructorArguments: params })
     console.log('Verified on Etherscan!')
   } catch (error) {
     console.log('Couldnt verify on Etherscan:\n', error)
