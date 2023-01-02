@@ -46,7 +46,7 @@ describe('Marketplace Tests', function () {
     // Non-token owner can't place sell order
     await expect(
       marketplace.connect(seller).makeSellOrder(1, 1, 1, true)
-    ).to.be.revertedWith('ERC1155: caller is not token owner nor approved')
+    ).to.be.revertedWith('ERC1155: caller is not token owner or approved')
     // Mint token to seller
     await talentirNFT.mint(
       seller.address,
@@ -61,7 +61,7 @@ describe('Marketplace Tests', function () {
     // Still can't make sell order because of missing allowance
     await expect(
       marketplace.connect(seller).makeSellOrder(1, 1, 1, true)
-    ).to.be.revertedWith('ERC1155: caller is not token owner nor approved')
+    ).to.be.revertedWith('ERC1155: caller is not token owner or approved')
     // Grant allowance and make sell order, add to orderbook
     await expect(
       talentirNFT.setNftMarketplaceApproval(marketplace.address, true)

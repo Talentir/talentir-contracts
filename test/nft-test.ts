@@ -91,7 +91,7 @@ describe('TalentirNFT', function () {
       talentir
         .connect(johnny)
         .safeTransferFrom(luki.address, johnny.address, tokenID1, 1, '0x')
-    ).to.be.revertedWith('ERC1155: caller is not token owner nor approved')
+    ).to.be.revertedWith('ERC1155: caller is not token owner or approved')
 
     await expect(
       talentir.connect(luki).setNftMarketplaceApproval(johnny.address, true)
@@ -121,7 +121,7 @@ describe('TalentirNFT', function () {
       talentir
         .connect(johnny)
         .safeTransferFrom(luki.address, johnny.address, tokenID1, 1, '0x')
-    ).to.be.revertedWith('ERC1155: caller is not token owner nor approved')
+    ).to.be.revertedWith('ERC1155: caller is not token owner or approved')
 
     await talentir.connect(luki).setApprovalForAll(johnny.address, true)
 
