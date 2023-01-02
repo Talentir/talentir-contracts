@@ -40,7 +40,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     address public TalentirNFT;
     uint256 public talentirFeePercent;
     address public talentirFeeWallet;
-    uint256 public nextOrderId;
+    uint256 public nextOrderId = 1;
     uint256 internal constant PERCENT = 100000;
 
     /// EVENTS ///
@@ -66,8 +66,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
 
     /// CONSTRUCTOR ///
 
-    constructor(address _talentirNFT, uint256 _nextOrderId) {
-        nextOrderId = _nextOrderId;
+    constructor(address _talentirNFT) {
         TalentirNFT = _talentirNFT;
         require(IERC1155(TalentirNFT).supportsInterface(0x2a55205a)); // must implement ERC-2981 royalties standard
     }
@@ -211,12 +210,8 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         uint256 bestPrice;
         uint256 bestOrderId;
         uint256 price = _ETHquantity / _tokenQuantity;
+        uint256 ETHquantityExecuted;
         require(_ETHquantity > 0, "Price must be positive");
-        // This check prevents orders from being added if there are rounding problems:
-        // require(
-        //     _side == Side.BUY ? price * _tokenQuantity <= _ETHquantity : price * _tokenQuantity >= _ETHquantity,
-        //     "Rounding problem"
-        // );
         Side oppositeSide = _oppositeSide(_side);
         (bestOrderId, bestPrice) = getBestOrder(_tokenId, oppositeSide);
         // If possible, buy up to the specified price limit
@@ -232,8 +227,11 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
             } else {
                 quantityToBuy = orders[bestOrderId].quantity;
             }
-            _ETHquantity -=  _executeOrder(bestOrderId, quantityToBuy);
+            ETHquantityExecuted = _executeOrder(bestOrderId, quantityToBuy);
             remainingQuantity -= quantityToBuy;
+            if ((_side == Side.BUY) && !(_addOrderForRemaining)) {
+                _ETHquantity -= ETHquantityExecuted;
+            }
             if (remainingQuantity > 0) {
                 (bestOrderId, bestPrice) = getBestOrder(_tokenId, oppositeSide);
             }
@@ -309,7 +307,13 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     }
 
     /// @dev Add order to all data structures.
-    function _addOrder(uint256 _tokenId, Side _side, address _sender, uint256 _price, uint256 _quantity) internal {
+    function _addOrder(
+        uint256 _tokenId,
+        Side _side,
+        address _sender,
+        uint256 _price,
+        uint256 _quantity
+    ) internal {
         // Transfer tokens to this contract
         if (_side == Side.SELL) {
             _safeTransferFrom(TalentirNFT, _tokenId, _sender, address(this), _quantity);
