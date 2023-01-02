@@ -285,7 +285,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
                     (success, ) = royaltiesReceiver.call{value: royaltiesAmount}("");
                     (success, ) = talentirFeeWallet.call{value: talentirFee}("");
                     // Caller is the buyer - distribute to seller first
-                    (success, ) = msg.sender.call{value: (price * _quantity) - royaltiesAmount - talentirFee}("");
+                    (success, ) = sender.call{value: (price * _quantity) - royaltiesAmount - talentirFee}("");
                     _safeTransferFrom(TalentirNFT, tokenId, address(this), msg.sender, _quantity);
                 }
             }
