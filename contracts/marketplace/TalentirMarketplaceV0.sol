@@ -37,7 +37,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     /// @dev tokenId => Side => OrderBook
     mapping(uint256 => Order) public orders; /// @dev OrderId => Order
     mapping(address => LinkedListLibrary.LinkedList) userOrders; /// @dev User => Linked list of open orders by user
-    address public TalentirNFT;
+    address public immutable talentirNFT;
     uint256 public talentirFeePercent;
     address public talentirFeeWallet;
     uint256 public nextOrderId = 1;
@@ -67,8 +67,8 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     /// CONSTRUCTOR ///
 
     constructor(address _talentirNFT) {
-        TalentirNFT = _talentirNFT;
-        require(IERC1155(TalentirNFT).supportsInterface(0x2a55205a)); // must implement ERC-2981 royalties standard
+        require(IERC165(_talentirNFT).supportsInterface(0x2a55205a)); // must implement ERC-2981 royalties standard
+        talentirNFT = _talentirNFT;
     }
 
     /// VIEW FUNCTIONS ///
@@ -160,7 +160,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
             if (side == Side.BUY) {
                 (success, ) = msg.sender.call{value: (price * quantity)}("");
             } else {
-                _safeTransferFrom(TalentirNFT, tokenId, address(this), msg.sender, quantity);
+                _safeTransferFrom(talentirNFT, tokenId, address(this), msg.sender, quantity);
             }
             emit OrderCancelled(orderId);
         }
@@ -257,7 +257,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         uint256 price = orders[_orderId].price;
         address sender = orders[_orderId].sender;
         bool success;
-        (address royaltiesReceiver, uint256 royaltiesAmount) = IERC2981(TalentirNFT).royaltyInfo(
+        (address royaltiesReceiver, uint256 royaltiesAmount) = IERC2981(talentirNFT).royaltyInfo(
             tokenId,
             (price * _quantity)
         );
@@ -277,7 +277,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
                 (success, ) = royaltiesReceiver.call{value: royaltiesAmount}("");
                 (success, ) = talentirFeeWallet.call{value: talentirFee}("");
                 // Caller is the seller - distribute to buyer first
-                _safeTransferFrom(TalentirNFT, tokenId, msg.sender, sender, _quantity);
+                _safeTransferFrom(talentirNFT, tokenId, msg.sender, sender, _quantity);
                 // Seller receives price*quantity - fees
                 (success, ) = msg.sender.call{value: (price * _quantity) - royaltiesAmount - talentirFee}("");
             } else {
@@ -287,7 +287,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
                 (success, ) = talentirFeeWallet.call{value: talentirFee}("");
                 // Caller is the buyer - distribute to seller first
                 (success, ) = sender.call{value: (price * _quantity) - royaltiesAmount - talentirFee}("");
-                _safeTransferFrom(TalentirNFT, tokenId, address(this), msg.sender, _quantity);
+                _safeTransferFrom(talentirNFT, tokenId, address(this), msg.sender, _quantity);
             }
         }
         {
@@ -316,7 +316,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     ) internal {
         // Transfer tokens to this contract
         if (_side == Side.SELL) {
-            _safeTransferFrom(TalentirNFT, _tokenId, _sender, address(this), _quantity);
+            _safeTransferFrom(talentirNFT, _tokenId, _sender, address(this), _quantity);
         }
         // Check if orders already exist at that price, otherwise add tree entry
         if (!markets[_tokenId][_side].priceTree.exists(_price)) {

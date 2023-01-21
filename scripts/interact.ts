@@ -16,9 +16,9 @@ async function main (): Promise<void> {
   console.log('TalentirNFT: Approved marketplace: ', marketplaceAddress, ' tx:', tx1.hash)
 
   // Grant the Openzeppelin Relay the Minter Role
-  const relayAddres = '0x79e08374a52c6e917c7b4808559b17a9f606d9b0'
-  const tx3 = await talentirNFT.setMinterRole(relayAddres)
-  console.log('TalentirNFT: Granted Minter Role to: ', relayAddres, ' tx:', tx3.hash)
+  const relayAddress = '0x79e08374a52c6e917c7b4808559b17a9f606d9b0'
+  const tx3 = await talentirNFT.setMinterRole(relayAddress)
+  console.log('TalentirNFT: Granted Minter Role to: ', relayAddress, ' tx:', tx3.hash)
 }
 
 main().catch((error) => {
