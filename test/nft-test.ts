@@ -27,9 +27,9 @@ describe('TalentirNFT', function () {
   it('Uri', async function () {
     const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
     const contentID1 = '1'
+
     const tokenID1 = await talentir.contentIdToTokenId(contentID1)
 
-    await talentir.setMinterRole(minter.address)
     await talentir
       .connect(minter)
       .mint(luki.address, cid1, contentID1, luki.address)
@@ -38,11 +38,9 @@ describe('TalentirNFT', function () {
     expect(uri).to.equal(`ipfs://${cid1}`)
   })
 
-  it('Test Minting / Burning', async function () {
+  it('disallows interactions from unpermitted accounts', async function() {
     const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
     const contentID1 = '1'
-    const tokenID1 = await talentir.contentIdToTokenId(contentID1)
-
     await expect(
       talentir.mint(luki.address, cid1, contentID1, luki.address)
     ).to.be.revertedWith('Not allowed')
@@ -51,6 +49,12 @@ describe('TalentirNFT', function () {
       talentir.connect(luki).setMinterRole(minter.address)
     ).to.be.revertedWith('Ownable: caller is not the owner')
     await talentir.setMinterRole(minter.address)
+  });
+
+  it('mints and burns', async function () {
+    const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
+    const contentID1 = '1'
+    const tokenID1 = await talentir.contentIdToTokenId(contentID1)
 
     await expect(
       talentir
@@ -59,7 +63,7 @@ describe('TalentirNFT', function () {
     ).to.emit(talentir, 'TransferSingle')
 
     const balance = await talentir.balanceOf(luki.address, tokenID1)
-    expect(balance).to.equal(1000000)
+    expect(balance).to.equal(1_000_000)
 
     await expect(
       talentir
@@ -67,6 +71,7 @@ describe('TalentirNFT', function () {
         .mint(luki.address, cid1, contentID1, luki.address)
     ).to.be.revertedWith('Token already minted')
 
+    //todo see contract comment. Why shouldn't this be possible :thinking_face:
     await expect(
       talentir.connect(luki).burn(luki.address, tokenID1, 1000)
     ).to.be.revertedWith('Ownable: caller is not the owner')
@@ -74,10 +79,10 @@ describe('TalentirNFT', function () {
     await talentir.burn(luki.address, tokenID1, 1000)
 
     const balance2 = await talentir.balanceOf(luki.address, tokenID1)
-    expect(balance2).to.equal(999000)
+    expect(balance2).to.equal(999_000)
   })
 
-  it('Marketplace address', async function () {
+  it('can approve a marketplace to transfer tokens', async function () {
     const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
     const contentID1 = '1'
     const tokenID1 = await talentir.contentIdToTokenId(contentID1)
@@ -87,6 +92,7 @@ describe('TalentirNFT', function () {
       .connect(minter)
       .mint(luki.address, '', contentID1, ethers.constants.AddressZero)
 
+      //todo: this is an unrelated testcase. Move to its own test:
     await expect(
       talentir
         .connect(johnny)
@@ -97,6 +103,7 @@ describe('TalentirNFT', function () {
       talentir.connect(luki).setNftMarketplaceApproval(johnny.address, true)
     ).to.be.revertedWith('Ownable: caller is not the owner')
 
+    // "johnny" is a marketplace????
     await talentir.setNftMarketplaceApproval(johnny.address, true)
 
     await talentir
@@ -107,7 +114,7 @@ describe('TalentirNFT', function () {
     expect(balance).to.equal(1)
   })
 
-  it('Approval', async function () {
+  it('can approve an account to transfer tokens', async function () {
     const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
     const contentID1 = '1'
     const tokenID1 = await talentir.contentIdToTokenId(contentID1)
@@ -117,6 +124,7 @@ describe('TalentirNFT', function () {
       .connect(minter)
       .mint(luki.address, '', contentID1, ethers.constants.AddressZero)
 
+      //todo tested already, see above
     await expect(
       talentir
         .connect(johnny)
@@ -141,7 +149,7 @@ describe('TalentirNFT', function () {
 
     await expect(
       talentir.connect(minter).mint(luki.address, '', contentID, johnny.address)
-    )
+    ) //todo: this assertion should move higher up 
       .to.emit(talentir, 'TalentChanged')
       .withArgs(ethers.constants.AddressZero, johnny.address, tokenID1)
 
@@ -245,6 +253,7 @@ describe('TalentirNFT', function () {
       .to.emit(talentir, 'TalentChanged')
       .withArgs(ethers.constants.AddressZero, johnny.address, tokenID1)
 
+      //todo this has been tested above already
     await expect(
       talentir.connect(luki).updateTalent(tokenID1, luki.address)
     ).to.be.revertedWith('Royalty receiver must update')

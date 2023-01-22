@@ -37,11 +37,13 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, Ownable, Pausable {
     /**
      * @notice Changing the royalty percentage of every sale. 1% = 1_000
      */
+    //todo: why are you splitting up this logic between your own 2981 impl and this one?
     function setRoyalty(uint256 percent) public onlyOwner {
         require(percent <= 100_000, "Must be <= 100%");
         _setRoyaltyPercent(percent);
     }
 
+    //todo doing so allows only 1 address to mint tokens. Consider using AccessControl instead
     function setMinterRole(address minterAddress) public onlyOwner {
         _minterAddress = minterAddress;
     }
@@ -50,6 +52,7 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, Ownable, Pausable {
      * @notice Approve a new Marketplace Contract so users need less gas when selling and buying NFTs
      * on the Talentir contract.
      */
+    //todo call it `approveNftMarketplace` 
     function setNftMarketplaceApproval(address marketplace, bool approval) public onlyOwner {
         approvedMarketplaces[marketplace] = approval;
         emit MarketplaceApproved(marketplace, approval);
@@ -67,21 +70,26 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, Ownable, Pausable {
      * @param royaltyReceiver The address to receive the royalty for the token.
      */
     function mint(
-        address to, // the address to mint the token to
-        string memory cid, // the IPFS CID of the content
+        address to,
+        string memory cid, 
         string memory contentID,
-        address royaltyReceiver // the address to receive the royalty
+        address royaltyReceiver 
     ) public onlyMinter {
         uint256 tokenId = contentIdToTokenId(contentID);
+        
         require(bytes(_tokenCIDs[tokenId]).length == 0, "Token already minted");
-        _mint(to, tokenId, 1000000, "");
         _tokenCIDs[tokenId] = cid;
         _setTalent(tokenId, royaltyReceiver);
+        //move this to be the last call (CIE)
+        //todo: declare the default fraction (a million) as constant instead
+        _mint(to, tokenId, 1_000_000, "");
     }
 
     /**
      * @notice Burn a token. This is only possible for the owner of the token.
      */
+    //todo this is only callable by the owner of the contract, not the owner of the token, 
+    //which means that the contract owner may burn any token at will.
     function burn(address account, uint256 tokenID, uint256 value) public virtual onlyOwner {
         _burn(account, tokenID, value);
     }
