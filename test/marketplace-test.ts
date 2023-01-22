@@ -532,4 +532,67 @@ describe('Marketplace Tests', function () {
       [1, -1]
     )
   })
+
+  const contentIdToTokenIdLocal = (tokenId: string) => {
+    return ethers.BigNumber.from(ethers.utils.keccak256(ethers.utils.solidityPack(["string"], [tokenId])));
+  }
+  it('can create token ids locally', async function() {
+    expect(
+      contentIdToTokenIdLocal("abc").eq(
+        await talentirNFT.contentIdToTokenId('abc')
+      )
+    );
+  })
+
+  it('gas costs dont depend on order tree size', async function () {
+    await talentirNFT.setNftMarketplaceApproval(marketplace.address, true)
+    const mintPromises= [1,2,3,4,5,6,7,8,9,10].map(num => (async() => {
+      await talentirNFT.mint(
+        seller.address,
+        'Qmabcd',
+        `abc${num}`,
+        royaltyReceiver.address
+      )
+
+      return contentIdToTokenIdLocal(`abc${num}`)
+    })())
+    
+    const tokenIds = await Promise.all(mintPromises);
+
+    const sellOrders = await Promise.all(tokenIds.map(tokenId => (async() => {
+      const tx = await marketplace.connect(seller).makeSellOrder(tokenId, someEther, 1000, true)
+      const receipt = await tx.wait();
+      let bestOrder = await marketplace.getBestOrder(tokenId, SELL)
+      let order = await marketplace.orders(bestOrder[0])
+      return {gas: receipt.gasUsed, order}
+    })()))
+
+    let baseGas = sellOrders[1].gas;
+    console.log("[gas] create sell order ", baseGas)
+    sellOrders.slice(1).map(so => {
+      expect(baseGas.eq(so.gas)).to.be.true
+    })
+
+    const otherBuyer = (await ethers.getSigners())[5];
+    const buyOrders = await Promise.all(tokenIds.map(tokenId => (async() => {
+      const tx = await marketplace.connect(buyer).makeBuyOrder(tokenId, 500, true, {value: someEther.div(2)})
+      const receipt = await tx.wait();
+      const bal =  await talentirNFT.balanceOf(buyer.address, tokenId);
+      expect(bal.toNumber()).equal(500);
+
+      const receipt2 = await (await marketplace.connect(otherBuyer).makeBuyOrder(tokenId, 500, true, {value: someEther.div(2)})).wait()
+      expect((await talentirNFT.balanceOf(otherBuyer.address, tokenId)).toNumber()).equal(500);
+
+
+      return {gas1: receipt.gasUsed, gas2: receipt2.gasUsed}
+
+    })()))
+    
+    baseGas = buyOrders[1].gas1;
+    console.log("[gas] partially buy sell order ", baseGas)
+    buyOrders.slice(1,8).map(so => { //the first and last transaction is slightly different
+      expect(baseGas.eq(so.gas1)).to.be.true
+    })
+
+  })
 })
