@@ -16,6 +16,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 /// TYPES ///
 import {Side, Order} from "./OrderTypes.sol";
 
@@ -23,25 +24,34 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     /// LIBRARIES ///
     using RBTLibrary for RBTLibrary.Tree;
     using LinkedListLibrary for LinkedListLibrary.LinkedList;
+    using Address for address payable;
 
     /// TYPES ///
     struct OrderBook {
         RBTLibrary.Tree priceTree;
+
+        /// @dev tokenId => orders
         mapping(uint256 => LinkedListLibrary.LinkedList) orderList;
     }
 
     /// CONTRACTS ///
+    address public immutable talentirNFT;
 
     /// STATE ///
-    mapping(uint256 => mapping(Side => OrderBook)) markets;
+    
     /// @dev tokenId => Side => OrderBook
-    mapping(uint256 => Order) public orders; /// @dev OrderId => Order
-    mapping(address => LinkedListLibrary.LinkedList) userOrders; /// @dev User => Linked list of open orders by user
-    address public immutable talentirNFT;
+    mapping(uint256 => mapping(Side => OrderBook)) markets;
+
+    /// @dev OrderId => Order
+    mapping(uint256 => Order) public orders; 
+
+    /// @dev User => Linked list of open orders by user
+    mapping(address => LinkedListLibrary.LinkedList) userOrders; 
+    
     uint256 public talentirFeePercent;
-    address public talentirFeeWallet;
+    address payable public talentirFeeWallet;
     uint256 public nextOrderId = 1;
-    uint256 internal constant PERCENT = 100000;
+    uint256 internal constant PERCENT = 100_000;
 
     /// EVENTS ///
     event OrderAdded(
@@ -67,7 +77,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     /// CONSTRUCTOR ///
 
     constructor(address _talentirNFT) {
-        require(IERC165(_talentirNFT).supportsInterface(0x2a55205a)); // must implement ERC-2981 royalties standard
+        require(IERC165(_talentirNFT).supportsInterface(type(IERC2981).interfaceId)); // must implement ERC-2981 royalties standard
         talentirNFT = _talentirNFT;
     }
 
@@ -91,6 +101,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     /**
         @notice Computes the fee amount to be paid to Talentir for a transaction of size `_totalPaid`
         @dev Computes the fee amount to be paid for a transaction of size `_quantity`. 
+//todo what is `_quantity` ??
         @param _totalPaid price*volume
         @return uint256 fee 
      */
@@ -104,6 +115,8 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         @notice Sell `tokenQuantity` of token `tokenId` for min `ETHquantity` total price. (ERC1155)
         @dev Sell `tokenQuantity` of token `tokenId` for min `ETHquantity` total price. (ERC1155)
         @dev Price limit must always be included to prevent frontrunning. 
+//todo, ok, but where is the price limit?
+
         @dev Sender address must be able to receive Ether, otherwise funds may be lost (ony relevant if sent from a smart contract)
         @dev Does NOT work for ERC20!. 
         @dev can emit multiple OrderExecuted events. 
@@ -148,7 +161,6 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         @param orderIds array of order Ids
      */
     function cancelOrders(uint256[] calldata orderIds) external nonReentrant {
-        bool success;
         for (uint256 i = 0; i < orderIds.length; i++) {
             uint256 orderId = orderIds[i];
             require(msg.sender == orders[orderId].sender, "Wrong user");
@@ -158,7 +170,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
             uint256 tokenId = orders[orderId].tokenId;
             _removeOrder(orderId);
             if (side == Side.BUY) {
-                (success, ) = msg.sender.call{value: (price * quantity)}("");
+                (payable(msg.sender)).sendValue(price * quantity);
             } else {
                 _safeTransferFrom(talentirNFT, tokenId, address(this), msg.sender, quantity);
             }
@@ -185,7 +197,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         @param _fee fee percent (100% = 100,000)
         @param _wallet address where Talentir fee will be sent to
      */
-    function setTalentirFee(uint256 _fee, address _wallet) external onlyOwner {
+    function setTalentirFee(uint256 _fee, address payable _wallet) external onlyOwner {
         require(_fee <= PERCENT / 10, "Must be <=10k"); // Talentir fee can never be higher than 10%
         talentirFeePercent = _fee;
         talentirFeeWallet = _wallet;
@@ -196,7 +208,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
 
     /// @dev Return BUY for SELL or vice versa.
     function _oppositeSide(Side _side) internal pure returns (Side) {
-        return Side(1 - uint8(_side));
+        return (_side == Side.BUY) ? Side.SELL : Side.BUY;
     }
 
     /// @dev Make a limit order. Internally, all orders are limit orders to prevent frontrunning.
@@ -210,6 +222,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         require(_ETHquantity > 0, "Price must be positive");
         require(_tokenQuantity > 0, "Token quantity must be positive");
         uint256 price = _ETHquantity / _tokenQuantity;
+//is this a rounding problem?? 
         require(price > 0, "Rounding problem");
         uint256 bestPrice;
         uint256 bestOrderId;
@@ -229,7 +242,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
             } else {
                 quantityToBuy = orders[bestOrderId].quantity;
             }
-            ETHquantityExecuted = _executeOrder(bestOrderId, quantityToBuy);
+            ETHquantityExecuted = _executeOrder(_tokenId, bestOrderId, quantityToBuy);
             remainingQuantity -= quantityToBuy;
             if ((_side == Side.BUY) && !(_addOrderForRemaining)) {
                 _ETHquantity -= ETHquantityExecuted;
@@ -245,18 +258,16 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         // Refund any remaining ETH from a buy order not added to order book
         if ((_side == Side.BUY) && !(_addOrderForRemaining)) {
             require(msg.value >= _ETHquantity, "Couldn't refund"); // just to be safe - don't refund more than what was sent
-            bool success;
-            (success, ) = msg.sender.call{value: _ETHquantity}("");
+            (payable(msg.sender)).sendValue(_ETHquantity);
         }
     }
 
     /// @dev Executes one atomic order (transfers tokens and removes order).
-    function _executeOrder(uint256 _orderId, uint256 _quantity) internal returns (uint256 ETHquantity) {
-        uint256 tokenId = orders[_orderId].tokenId;
+    function _executeOrder(uint256 tokenId, uint256 _orderId, uint256 _quantity) internal returns (uint256 ETHquantity) {
+//todo: this method is only called by `_makeOrder`. Consider handing over these parameters to save gas:
         Side side = orders[_orderId].side;
         uint256 price = orders[_orderId].price;
-        address sender = orders[_orderId].sender;
-        bool success;
+        address payable sender = payable(orders[_orderId].sender);
         (address royaltiesReceiver, uint256 royaltiesAmount) = IERC2981(talentirNFT).royaltyInfo(
             tokenId,
             (price * _quantity)
@@ -271,22 +282,29 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
             } else {
                 orders[_orderId].quantity -= _quantity;
             }
+//todo: `royaltiesReceiver` addresses are potentially untrusted and can be malicious
+//consider accrueing value for them here and allow them to withdraw it on their own
+//see https://docs.openzeppelin.com/contracts/4.x/api/security#PullPayment
+//(requires bookkeeping of outstanding payments on your own)
+//this relates to the Slither reentrancy vulnerability remark
             if (side == Side.BUY) {
                 // Original order was a buy order: ETH has already been transferred into the contract
                 // Distribute Fees from contract
-                (success, ) = royaltiesReceiver.call{value: royaltiesAmount}("");
-                (success, ) = talentirFeeWallet.call{value: talentirFee}("");
+                (payable(royaltiesReceiver)).sendValue(royaltiesAmount);
+                talentirFeeWallet.sendValue(talentirFee);
                 // Caller is the seller - distribute to buyer first
                 _safeTransferFrom(talentirNFT, tokenId, msg.sender, sender, _quantity);
                 // Seller receives price*quantity - fees
-                (success, ) = msg.sender.call{value: (price * _quantity) - royaltiesAmount - talentirFee}("");
+                (payable(msg.sender)).sendValue((price * _quantity) - royaltiesAmount - talentirFee);
+                
             } else {
                 // Original order was a sell order: NFT has already been transferred into the contract
                 // Distribute Fees
-                (success, ) = royaltiesReceiver.call{value: royaltiesAmount}("");
-                (success, ) = talentirFeeWallet.call{value: talentirFee}("");
+                (payable(royaltiesReceiver)).sendValue(royaltiesAmount);
+                talentirFeeWallet.sendValue(talentirFee);
+
                 // Caller is the buyer - distribute to seller first
-                (success, ) = sender.call{value: (price * _quantity) - royaltiesAmount - talentirFee}("");
+                sender.sendValue((price * _quantity) - royaltiesAmount - talentirFee);
                 _safeTransferFrom(talentirNFT, tokenId, address(this), msg.sender, _quantity);
             }
         }

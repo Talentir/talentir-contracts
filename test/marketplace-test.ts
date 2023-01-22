@@ -14,7 +14,7 @@ describe('Marketplace Tests', function () {
   let talentirFeeReceiver: SignerWithAddress
   const BUY = 0
   const SELL = 1
-  const oneEther = ethers.utils.parseEther('0.0000000001') // full Ether causes overflow in etherBalanceToChange function
+  const someEther = ethers.utils.parseEther('0.0000000001') // full Ether causes overflow in etherBalanceToChange function
 
   beforeEach(async function () {
     [owner, buyer, seller, royaltyReceiver, talentirFeeReceiver] =
@@ -27,6 +27,7 @@ describe('Marketplace Tests', function () {
     const MarketplaceFactory = await ethers.getContractFactory(
       'TalentirMarketplaceV0'
     )
+//todo: it's not good practice to put assertions in non-test methods. move them to their own test case
     await expect(MarketplaceFactory.deploy(owner.address)).to.be.reverted
     marketplace = await MarketplaceFactory.deploy(talentirNFT.address)
     await marketplace.deployed()
@@ -37,7 +38,7 @@ describe('Marketplace Tests', function () {
     // Set minter role to owner
     await talentirNFT.setMinterRole(owner.address)
   })
-
+//todo: this test tests far too many things. Split this into use cases
   it('should open and close a single order (no fees)', async function () {
     // Set royalties to 0 (will be tested later)
     await expect(talentirNFT.setRoyalty(0)).to.emit(
@@ -69,7 +70,7 @@ describe('Marketplace Tests', function () {
     ).to.emit(talentirNFT, 'MarketplaceApproved')
     // Can't add orders with 0 quantity or price
     await expect(
-      marketplace.connect(seller).makeSellOrder(tokenId, oneEther, 0, true)
+      marketplace.connect(seller).makeSellOrder(tokenId, someEther, 0, true)
     ).to.be.revertedWith('Token quantity must be positive')
     await expect(
       marketplace.connect(seller).makeSellOrder(tokenId, 0, 1, true)
@@ -77,6 +78,7 @@ describe('Marketplace Tests', function () {
     await expect(
       marketplace.connect(seller).makeSellOrder(tokenId, 0, 0, true)
     ).to.be.revertedWith('Price must be positive')
+
     await expect(
       marketplace
         .connect(buyer)
@@ -91,23 +93,26 @@ describe('Marketplace Tests', function () {
     // Can't add order with rounding problem
     await expect(
       marketplace.connect(seller).makeSellOrder(tokenId, 1, 2, true)
+//todo to avoid that, I'd rather require ETHquantity larger than a certain value (buying for 1 wei is pointless anyway)
     ).to.be.revertedWith('Rounding problem')
+
+//todo: here the happy path starts. Consider cutting the test case here.
     // Add order to orderbook
     await expect(
-      marketplace.connect(seller).makeSellOrder(tokenId, oneEther, 1, true)
+      marketplace.connect(seller).makeSellOrder(tokenId, someEther, 1, true)
     ).to.emit(marketplace, 'OrderAdded')
-    let orderID = await marketplace.getBestOrder(tokenId, SELL)
-    let order = await marketplace.orders(orderID[0])
-    expect(orderID[0]).to.equal(1)
-    expect(orderID[1]).to.equal(oneEther)
+    let bestOrder = await marketplace.getBestOrder(tokenId, SELL)
+    let order = await marketplace.orders(bestOrder[0])
+    expect(bestOrder[0]).to.equal(1)
+    expect(bestOrder[1]).to.equal(someEther)
     expect(order.tokenId).to.equal(tokenId)
     expect(order.side).to.equal(SELL)
     expect(order.sender).to.equal(seller.address)
-    expect(order.price).to.equal(oneEther)
+    expect(order.price).to.equal(someEther)
     expect(order.quantity).to.equal(1)
     // Balances are updated
     expect(await talentirNFT.balanceOf(seller.address, tokenId)).to.equal(
-      999999
+      999_999
     )
     expect(await talentirNFT.balanceOf(marketplace.address, tokenId)).to.equal(
       1
@@ -119,45 +124,47 @@ describe('Marketplace Tests', function () {
           .connect(buyer)
           .makeBuyOrder(tokenId, 1, false, { value: 1000 })
     ).to.changeEtherBalances([buyer, marketplace], [0, 0])
-    orderID = await marketplace.getBestOrder(tokenId, BUY)
-    order = await marketplace.orders(orderID[0])
-    expect(orderID[0]).to.equal(0)
-    expect(orderID[1]).to.equal(0)
+    bestOrder = await marketplace.getBestOrder(tokenId, BUY)
+    order = await marketplace.orders(bestOrder[0])
+    expect(bestOrder[0]).to.equal(0)
+    expect(bestOrder[1]).to.equal(0)
     expect(order.side).to.equal(0)
     expect(order.price).to.equal(0)
     expect(order.quantity).to.equal(0)
-    // Buyer makes a buy order with too low price, added to order book
+
+    // Buyer makes a partial buy order with too low price, added to order book
     await expect(
       async () =>
         await marketplace
           .connect(buyer)
           .makeBuyOrder(tokenId, 1, true, { value: 1000 })
     ).to.changeEtherBalances([buyer, marketplace], [-1000, 1000])
-    orderID = await marketplace.getBestOrder(tokenId, BUY)
-    order = await marketplace.orders(orderID[0])
-    expect(orderID[0]).to.equal(2)
-    expect(orderID[1]).to.equal(1000)
+    bestOrder = await marketplace.getBestOrder(tokenId, BUY)
+    order = await marketplace.orders(bestOrder[0])
+    expect(bestOrder[0]).to.equal(2)
+    expect(bestOrder[1]).to.equal(1000)
     expect(order.tokenId).to.equal(tokenId)
     expect(order.side).to.equal(BUY)
     expect(order.sender).to.equal(buyer.address)
     expect(order.price).to.equal(1000)
     expect(order.quantity).to.equal(1)
+
     // Buyer makes a buy order with higher price than asked, executes, removes executed order and refunds the excess Ether
     const buyTransaction = marketplace
       .connect(buyer)
-      .makeBuyOrder(tokenId, 1, false, { value: oneEther.mul(2) })
+      .makeBuyOrder(tokenId, 1, false, { value: someEther.mul(2) })
 
     await expect(buyTransaction).to.emit(marketplace, 'OrderExecuted')
 
     await expect(await buyTransaction).to.changeEtherBalances(
       [buyer, seller],
-      [-oneEther, oneEther]
+      [-someEther, someEther]
     )
 
-    orderID = await marketplace.getBestOrder(tokenId, SELL)
-    order = await marketplace.orders(orderID[0])
-    expect(orderID[0]).to.equal(0)
-    expect(orderID[1]).to.equal(0)
+    bestOrder = await marketplace.getBestOrder(tokenId, SELL)
+    order = await marketplace.orders(bestOrder[0])
+    expect(bestOrder[0]).to.equal(0)
+    expect(bestOrder[1]).to.equal(0)
     expect(order.side).to.equal(0)
     expect(order.price).to.equal(0)
     expect(order.quantity).to.equal(0)
@@ -169,16 +176,18 @@ describe('Marketplace Tests', function () {
     expect(await talentirNFT.balanceOf(marketplace.address, tokenId)).to.equal(
       0
     )
+
     // Second buy order is still open on the order book
-    orderID = await marketplace.getBestOrder(tokenId, BUY)
-    order = await marketplace.orders(orderID[0])
-    expect(orderID[0]).to.equal(2)
-    expect(orderID[1]).to.equal(1000)
+    bestOrder = await marketplace.getBestOrder(tokenId, BUY)
+    order = await marketplace.orders(bestOrder[0])
+    expect(bestOrder[0]).to.equal(2)
+    expect(bestOrder[1]).to.equal(1000)
     expect(order.tokenId).to.equal(tokenId)
     expect(order.side).to.equal(BUY)
     expect(order.sender).to.equal(buyer.address)
     expect(order.price).to.equal(1000)
     expect(order.quantity).to.equal(1)
+
     // Create a sell order that fills the buy order
     const transaction = marketplace
       .connect(seller)
@@ -190,17 +199,18 @@ describe('Marketplace Tests', function () {
       [marketplace, seller],
       [-1000, 1000]
     )
+
     // Order is removed
-    orderID = await marketplace.getBestOrder(tokenId, BUY)
-    order = await marketplace.orders(orderID[0])
-    expect(orderID[0]).to.equal(0)
-    expect(orderID[1]).to.equal(0)
+    bestOrder = await marketplace.getBestOrder(tokenId, BUY)
+    order = await marketplace.orders(bestOrder[0])
+    expect(bestOrder[0]).to.equal(0)
+    expect(bestOrder[1]).to.equal(0)
     expect(order.side).to.equal(0)
     expect(order.price).to.equal(0)
     expect(order.quantity).to.equal(0)
     // Balances are updated
     expect(await talentirNFT.balanceOf(seller.address, tokenId)).to.equal(
-      999998
+      999_998
     )
     expect(await talentirNFT.balanceOf(buyer.address, tokenId)).to.equal(2)
   })
@@ -219,7 +229,7 @@ describe('Marketplace Tests', function () {
     )
     const tokenId = await talentirNFT.contentIdToTokenId('abc')
     expect(await talentirNFT.balanceOf(seller.address, tokenId)).to.equal(
-      1000000
+      1_000_000
     )
     // Non-owner can't set fees
     await expect(
@@ -299,7 +309,7 @@ describe('Marketplace Tests', function () {
           .connect(seller)
           .makeSellOrder(
             tokenId,
-            oneEther.mul(2 * i).add(oneEther.mul(20)),
+            someEther.mul(2 * i).add(someEther.mul(20)),
             2,
             true
           )
@@ -307,25 +317,26 @@ describe('Marketplace Tests', function () {
 
       const transaction = marketplace
         .connect(buyer)
-        .makeBuyOrder(tokenId, 2, true, { value: oneEther.mul(i * 2) })
+        .makeBuyOrder(tokenId, 2, true, { value: someEther.mul(i * 2) })
 
       await expect(transaction).to.emit(marketplace, 'OrderAdded')
 
       await expect(await transaction).to.changeEtherBalances(
         [marketplace, buyer],
-        [oneEther.mul(i * 2), -oneEther.mul(i * 2)]
+        [someEther.mul(i * 2), -someEther.mul(i * 2)]
       )
     }
+
     // Add another order at the best price
     let transaction = marketplace.makeBuyOrder(tokenId, 2, true, {
-      value: oneEther.mul(20)
+      value: someEther.mul(20)
     })
 
     await expect(transaction).to.emit(marketplace, 'OrderAdded')
 
     await expect(await transaction).to.changeEtherBalances(
       [marketplace, owner],
-      [oneEther.mul(20), -oneEther.mul(20)]
+      [someEther.mul(20), -someEther.mul(20)]
     )
     // Check FIFO: best order should be the one added first, and that one shuld be executed
     let bestOrderId = await marketplace.getBestOrder(tokenId, BUY)
@@ -333,13 +344,13 @@ describe('Marketplace Tests', function () {
     expect(bestOrder.sender).to.equal(buyer.address)
     transaction = marketplace
       .connect(seller)
-      .makeSellOrder(tokenId, oneEther.mul(10), 2, true)
+      .makeSellOrder(tokenId, someEther.mul(10), 2, true)
 
     await expect(transaction).to.emit(marketplace, 'OrderExecuted')
 
     await expect(await transaction).to.changeEtherBalances(
       [marketplace, seller],
-      [-oneEther.mul(20), oneEther.mul(20)]
+      [-someEther.mul(20), someEther.mul(20)]
     )
 
     // New best order is the second one
@@ -350,66 +361,66 @@ describe('Marketplace Tests', function () {
     // Partially fill the buy orders
     transaction = marketplace
       .connect(seller)
-      .makeSellOrder(tokenId, oneEther, 1, false)
+      .makeSellOrder(tokenId, someEther, 1, false)
 
     await expect(transaction).to.emit(marketplace, 'OrderExecuted')
 
     await expect(await transaction).to.changeEtherBalances(
       [marketplace, seller],
-      [-oneEther.mul(10), oneEther.mul(10)]
+      [-someEther.mul(10), someEther.mul(10)]
     )
 
     bestOrderId = await marketplace.getBestOrder(tokenId, BUY)
     bestOrder = await marketplace.orders(bestOrderId[0])
-    expect(await bestOrder.quantity).to.equal(1)
+    expect(bestOrder.quantity).to.equal(1)
 
     // Partially fill the sell orders
     transaction = marketplace
       .connect(buyer)
-      .makeBuyOrder(tokenId, 1, false, { value: oneEther.mul(15) })
+      .makeBuyOrder(tokenId, 1, false, { value: someEther.mul(15) })
 
     await expect(transaction).to.emit(marketplace, 'OrderExecuted')
 
     await expect(await transaction).to.changeEtherBalances(
       [buyer, seller],
-      [-oneEther.mul(15), oneEther.mul(15)]
+      [-someEther.mul(15), someEther.mul(15)]
     )
 
     bestOrderId = await marketplace.getBestOrder(tokenId, SELL)
     bestOrder = await marketplace.orders(bestOrderId[0])
-    expect(await bestOrder.quantity).to.equal(1)
+    expect(bestOrder.quantity).to.equal(1)
 
     // Overfill the buy orders
     transaction = marketplace
       .connect(seller)
-      .makeSellOrder(tokenId, oneEther, 2, false)
+      .makeSellOrder(tokenId, someEther, 2, false)
 
     await expect(transaction).to.emit(marketplace, 'OrderExecuted')
 
     await expect(await transaction).to.changeEtherBalances(
       [marketplace, seller],
-      [-oneEther.mul(19), oneEther.mul(19)] // 10+9=19
+      [-someEther.mul(19), someEther.mul(19)] // 10+9=19
     )
 
     bestOrderId = await marketplace.getBestOrder(tokenId, BUY)
     bestOrder = await marketplace.orders(bestOrderId[0])
-    expect(await bestOrder.quantity).to.equal(1)
+    expect(bestOrder.quantity).to.equal(1)
 
     // Overfill the sell orders
     transaction = marketplace
       .connect(buyer)
-      .makeBuyOrder(tokenId, 2, false, { value: oneEther.mul(50) })
+      .makeBuyOrder(tokenId, 2, false, { value: someEther.mul(50) })
 
     await expect(transaction).to.emit(marketplace, 'OrderExecuted')
 
     await expect(await transaction).to.changeEtherBalances(
       [buyer, seller],
-      [-oneEther.mul(31), oneEther.mul(31)] // 15+16=31
+      [-someEther.mul(31), someEther.mul(31)] // 15+16=31
     )
 
     bestOrderId = await marketplace.getBestOrder(tokenId, SELL)
     bestOrder = await marketplace.orders(bestOrderId[0])
-    expect(await bestOrder.quantity).to.equal(1)
+    expect(bestOrder.quantity).to.equal(1)
   })
 
   it('should pause and cancel', async function () {
@@ -427,7 +438,7 @@ describe('Marketplace Tests', function () {
     await expect(
       talentirNFT.setNftMarketplaceApproval(marketplace.address, true)
     ).to.emit(talentirNFT, 'MarketplaceApproved')
-    await expect(marketplace.makeSellOrder(tokenId, oneEther, 1, true)).to.emit(
+    await expect(marketplace.makeSellOrder(tokenId, someEther, 1, true)).to.emit(
       marketplace,
       'OrderAdded'
     )
@@ -453,11 +464,11 @@ describe('Marketplace Tests', function () {
     // Can't make buy or sell orders
     await expect(
       marketplace.makeBuyOrder(tokenId, 1, true, {
-        value: oneEther
+        value: someEther
       })
     ).to.be.revertedWith('Pausable: paused')
     await expect(
-      marketplace.makeSellOrder(tokenId, oneEther, 1, true)
+      marketplace.makeSellOrder(tokenId, someEther, 1, true)
     ).to.be.revertedWith('Pausable: paused')
     // Other user can't cancel order on behalf of others
     await expect(
@@ -473,18 +484,18 @@ describe('Marketplace Tests', function () {
       [-1, 1]
     )
     // // Order is removed
-    let orderID = await marketplace.getBestOrder(tokenId, SELL)
-    let order = await marketplace.orders(orderID[0])
-    expect(orderID[0]).to.equal(0)
-    expect(orderID[1]).to.equal(0)
+    let bestOrder = await marketplace.getBestOrder(tokenId, SELL)
+    let order = await marketplace.orders(bestOrder[0])
+    expect(bestOrder[0]).to.equal(0)
+    expect(bestOrder[1]).to.equal(0)
     expect(order.side).to.equal(0)
     expect(order.price).to.equal(0)
     expect(order.quantity).to.equal(0)
 
-    orderID = await marketplace.getBestOrder(tokenId, BUY)
-    order = await marketplace.orders(orderID[0])
-    expect(orderID[0]).to.equal(0)
-    expect(orderID[1]).to.equal(0)
+    bestOrder = await marketplace.getBestOrder(tokenId, BUY)
+    order = await marketplace.orders(bestOrder[0])
+    expect(bestOrder[0]).to.equal(0)
+    expect(bestOrder[1]).to.equal(0)
     expect(order.side).to.equal(0)
     expect(order.price).to.equal(0)
     expect(order.quantity).to.equal(0)
@@ -506,7 +517,7 @@ describe('Marketplace Tests', function () {
     // Unpause contract
     await expect(marketplace.unpause()).to.emit(marketplace, 'Unpaused')
     // Can make orders again
-    await expect(marketplace.makeSellOrder(tokenId, oneEther, 1, true)).to.emit(
+    await expect(marketplace.makeSellOrder(tokenId, someEther, 1, true)).to.emit(
       marketplace,
       'OrderAdded'
     )
