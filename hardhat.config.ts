@@ -57,7 +57,6 @@ const config: HardhatUserConfig = {
     currency: 'EUR',
     coinmarketcap: '2dfd2e2c-7816-4596-8a6d-c6faa14697ea',
     token: 'ETH',
-    gasPriceApi: "https://api.arbiscan.io/api?module=proxy&action=eth_gasPrice"
   },
   etherscan: {
     apiKey: {
