@@ -2,8 +2,8 @@ import { ethers } from 'hardhat'
 import { TalentirMarketplaceV0__factory, TalentirTokenV0__factory } from '../typechain-types'
 
 async function main (): Promise<void> {
-  const tokenAddress = '0x7C99cAD32B8dd40a4a7eCCcc18640E170cC3Bd53'
-  const marketplaceAddress = '0xe184eeD49db54C5e04e2deFcAc0fC2C361eF1Af7'
+  const tokenAddress = '0x2195A9306d1B4Bb0B8d8709D4921f992a6a9D9a2'
+  const marketplaceAddress = '0x9e29471569af3cbAB99440cb07e3F96C57D1D5F0'
 
   const signer = await ethers.getSigners()
   const talentirNFTFactory = new TalentirTokenV0__factory(signer[0])

@@ -2,7 +2,7 @@ import { ethers } from 'hardhat'
 import { verifyEtherscan } from './utils'
 
 async function main (): Promise<void> {
-  const nftAddress = '0xfFdBFc5197bb6560a6Bf8d374D6308657545418f'
+  const nftAddress = '0x2195A9306d1B4Bb0B8d8709D4921f992a6a9D9a2'
   const TalentirMarketplace = await ethers.getContractFactory(
     'TalentirMarketplaceV0'
   )
