@@ -66,13 +66,13 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     );
 
     event OrderExecuted(
-        uint256 indexed orderId,
+        uint256 orderId,
         address indexed buyer,
         address indexed seller,
         uint256 paidToSeller,
         uint256 price,
         uint256 royalties,
-        address royaltiesReceiver,
+        address indexed royaltiesReceiver,
         uint256 quantity,
         uint256 remainingQuantity
     );
