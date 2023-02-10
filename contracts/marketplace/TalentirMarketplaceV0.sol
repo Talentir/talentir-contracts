@@ -70,7 +70,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         address indexed seller,
         address indexed buyer,
         uint256 paidToSeller,
-        uint256 paidByBuyer,
+        uint256 price,
         uint256 royalties,
         address royaltiesReceiver,
         uint256 quantity,
@@ -311,7 +311,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
             locals.buyer,               // buyer
             locals.seller,              // seller
             locals.payToSeller,         // paidToSeller
-            _quantity * order.price,    // paidByBuyer
+            order.price,                // price
             locals.royalties,           // royalties
             locals.royaltiesReceiver,   // royaltiesReceiver
             _quantity,                  // quantity
