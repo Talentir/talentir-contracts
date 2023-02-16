@@ -36,13 +36,18 @@ const config: HardhatUserConfig = {
     }
   },
   networks: {
-    rinkeby: {
-      url: process.env.RINKEBY_URL ?? '',
+    goerli: {
+      url: process.env.GOERLI_URL ?? '',
       accounts:
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : []
     },
-    goerli: {
-      url: process.env.GOERLI_URL ?? '',
+    arbitrumOne: {
+      url: process.env.ARBITRUM_URL ?? '',
+      accounts:
+        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : []
+    },
+    arbitrumGoerli: {
+      url: process.env.ARBITRUM_GOERLI_URL ?? '',
       accounts:
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : []
     }
@@ -51,15 +56,14 @@ const config: HardhatUserConfig = {
     enabled: process.env.REPORT_GAS !== undefined,
     currency: 'EUR',
     coinmarketcap: '2dfd2e2c-7816-4596-8a6d-c6faa14697ea',
-    token: 'ETH'
+    token: 'ETH',
   },
   etherscan: {
     apiKey: {
-      mainnet: process.env.ETHERSCAN_API_KEY,
-      rinkeby: process.env.ETHERSCAN_API_KEY,
-      goerli: process.env.ETHERSCAN_API_KEY,
-      arbitrumOne: process.env.ARBISCAN_API_KEY,
-      arbitrumTestnet: process.env.ARBISCAN_API_KEY
+      mainnet: process.env.ETHERSCAN_API_KEY ?? "",
+      goerli: process.env.ETHERSCAN_API_KEY ?? "",
+      arbitrumOne: process.env.ARBISCAN_API_KEY ?? "",
+      arbitrumGoerli: process.env.ARBISCAN_API_KEY ?? ""
     }
   }
 }

@@ -110,6 +110,18 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, Ownable, Pausable {
         return approvedMarketplaces[operator] == true || super.isApprovedForAll(owner, operator);
     }
 
+    function batchTransfer (address from, address[] memory to, uint256 id, uint256[] memory amounts, bytes memory data) public {
+        require(
+            from == _msgSender() || isApprovedForAll(from, _msgSender()),
+            "Caller is not token owner or approved"
+        );
+        require(to.length == amounts.length, "Invalid array length");
+
+        for (uint i = 0; i < to.length; i++) {
+            _safeTransferFrom(from, to[i], id, amounts[i], data);
+        }
+    }
+
     function _beforeTokenTransfer(
         address operator,
         address from,
