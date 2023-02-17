@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 contract ERC2981 is ERC165, IERC2981 {
     mapping(uint256 => address) internal _talents;
     uint256 private _royaltyPercent = 10_000;
+    uint256 internal constant PERCENT = 100_000;
 
     // - EVENTS
     event RoyaltyPercentageChanged(uint256 percent);
@@ -20,7 +21,7 @@ contract ERC2981 is ERC165, IERC2981 {
     ) public view override returns (address receiver, uint256 royaltyAmount) {
         require(_talents[tokenId] != address(0), "No royalty info for address");
         receiver = _talents[tokenId];
-        royaltyAmount = (value * _royaltyPercent) / 100_000;
+        royaltyAmount = (value * _royaltyPercent) / PERCENT;
     }
 
     function updateTalent(uint256 tokenId, address talent) public {

@@ -38,10 +38,9 @@ describe('TalentirNFT', function () {
     expect(uri).to.equal(`ipfs://${cid1}`)
   })
 
-  it('Test Minting / Burning', async function () {
+  it('disallows interactions from unpermitted accounts', async function () {
     const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
     const contentID1 = '1'
-    const tokenID1 = await talentir.contentIdToTokenId(contentID1)
 
     await expect(
       talentir.mint(luki.address, cid1, contentID1, luki.address)
@@ -51,7 +50,12 @@ describe('TalentirNFT', function () {
       talentir.connect(luki).setMinterRole(minter.address)
     ).to.be.revertedWith('Ownable: caller is not the owner')
     await talentir.setMinterRole(minter.address)
+  });
 
+  it('mints and burns', async function () {
+    const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
+    const contentID1 = '1'
+    const tokenID1 = await talentir.contentIdToTokenId(contentID1)
     await expect(
       talentir
         .connect(minter)
@@ -59,7 +63,7 @@ describe('TalentirNFT', function () {
     ).to.emit(talentir, 'TransferSingle')
 
     const balance = await talentir.balanceOf(luki.address, tokenID1)
-    expect(balance).to.equal(1000000)
+    expect(balance).to.equal(1_000_000)
 
     await expect(
       talentir
@@ -74,10 +78,10 @@ describe('TalentirNFT', function () {
     await talentir.burn(luki.address, tokenID1, 1000)
 
     const balance2 = await talentir.balanceOf(luki.address, tokenID1)
-    expect(balance2).to.equal(999000)
+    expect(balance2).to.equal(999_000)
   })
 
-  it('Marketplace address', async function () {
+  it('can approve a marketplace to transfer tokens', async function () {
     const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
     const contentID1 = '1'
     const tokenID1 = await talentir.contentIdToTokenId(contentID1)
@@ -107,7 +111,7 @@ describe('TalentirNFT', function () {
     expect(balance).to.equal(1)
   })
 
-  it('Approval', async function () {
+  it('can approve an account to transfer tokens', async function () {
     const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
     const contentID1 = '1'
     const tokenID1 = await talentir.contentIdToTokenId(contentID1)

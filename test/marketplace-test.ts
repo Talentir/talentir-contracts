@@ -57,7 +57,7 @@ describe('Marketplace Tests', function () {
     )
     const tokenId = await talentirNFT.contentIdToTokenId('abc')
     expect(await talentirNFT.balanceOf(seller.address, tokenId)).to.equal(
-      1000000
+      1_000_000
     )
     // Still can't make sell order because of missing allowance
     await expect(
@@ -107,7 +107,7 @@ describe('Marketplace Tests', function () {
     expect(order.quantity).to.equal(1)
     // Balances are updated
     expect(await talentirNFT.balanceOf(seller.address, tokenId)).to.equal(
-      999999
+      999_999
     )
     expect(await talentirNFT.balanceOf(marketplace.address, tokenId)).to.equal(
       1

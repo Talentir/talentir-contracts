@@ -45,15 +45,17 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     /// CONTRACTS ///
 
     /// STATE ///
-    mapping(uint256 => mapping(Side => OrderBook)) markets;
     /// @dev tokenId => Side => OrderBook
-    mapping(uint256 => Order) public orders; /// @dev OrderId => Order
-    mapping(address => LinkedListLibrary.LinkedList) userOrders; /// @dev User => Linked list of open orders by user
+    mapping(uint256 => mapping(Side => OrderBook)) markets;
+    /// @dev OrderId => Order
+    mapping(uint256 => Order) public orders;
+    /// @dev User => Linked list of open orders by user
+    mapping(address => LinkedListLibrary.LinkedList) userOrders;
     address public TalentirNFT;
     uint256 public talentirFeePercent;
     address public talentirFeeWallet;
     uint256 public nextOrderId = 1;
-    uint256 internal constant PERCENT = 100000;
+    uint256 internal constant PERCENT = 100_000;
 
     /// EVENTS ///
     event OrderAdded(
@@ -83,8 +85,8 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     /// CONSTRUCTOR ///
 
     constructor(address _talentirNFT) {
+        require(IERC165(_talentirNFT).supportsInterface(type(IERC2981).interfaceId)); // must implement ERC-2981 royalties standard
         TalentirNFT = _talentirNFT;
-        require(IERC1155(TalentirNFT).supportsInterface(0x2a55205a)); // must implement ERC-2981 royalties standard
     }
 
     /// VIEW FUNCTIONS ///
@@ -106,7 +108,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
 
     /**
         @notice Computes the fee amount to be paid to Talentir for a transaction of size `_totalPaid`
-        @dev Computes the fee amount to be paid for a transaction of size `_quantity`. 
+        @dev Computes the fee amount to be paid for a transaction of size `_totalPaid`. 
         @param _totalPaid price*volume
         @return uint256 fee 
      */
@@ -119,7 +121,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     /**
         @notice Sell `tokenQuantity` of token `tokenId` for min `ETHquantity` total price. (ERC1155)
         @dev Sell `tokenQuantity` of token `tokenId` for min `ETHquantity` total price. (ERC1155)
-        @dev Price limit must always be included to prevent frontrunning. 
+        @dev Price limit (`ETHquantity`) must always be included to prevent frontrunning. 
         @dev Sender address must be able to receive Ether, otherwise funds may be lost (ony relevant if sent from a smart contract)
         @dev Does NOT work for ERC20!. 
         @dev can emit multiple OrderExecuted events. 
@@ -212,7 +214,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
 
     /// @dev Return BUY for SELL or vice versa.
     function _oppositeSide(Side _side) internal pure returns (Side) {
-        return Side(1 - uint8(_side));
+        return (_side == Side.BUY) ? Side.SELL : Side.BUY;
     }
 
     /// @dev Make a limit order. Internally, all orders are limit orders to prevent frontrunning.
@@ -305,30 +307,24 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         (locals.success, ) = locals.seller.call{value: locals.payToSeller}("");
         (locals.success, ) = locals.royaltiesReceiver.call{value: locals.royalties}("");
         (locals.success, ) = talentirFeeWallet.call{value: locals.talentirFee}("");
-        
+
         emit OrderExecuted(
-            _orderId,                   // orderId
-            locals.buyer,               // buyer
-            locals.seller,              // seller
-            locals.payToSeller,         // paidToSeller
-            order.price,                // price
-            locals.royalties,           // royalties
-            locals.royaltiesReceiver,   // royaltiesReceiver
-            _quantity,                  // quantity
-            orders[_orderId].quantity   // remainingQuantity
+            _orderId, // orderId
+            locals.buyer, // buyer
+            locals.seller, // seller
+            locals.payToSeller, // paidToSeller
+            order.price, // price
+            locals.royalties, // royalties
+            locals.royaltiesReceiver, // royaltiesReceiver
+            _quantity, // quantity
+            orders[_orderId].quantity // remainingQuantity
         );
-        
+
         return order.price * _quantity;
     }
 
     /// @dev Add order to all data structures.
-    function _addOrder(
-        uint256 _tokenId,
-        Side _side,
-        address _sender,
-        uint256 _price,
-        uint256 _quantity
-    ) internal {
+    function _addOrder(uint256 _tokenId, Side _side, address _sender, uint256 _price, uint256 _quantity) internal {
         // Transfer tokens to this contract
         if (_side == Side.SELL) {
             _safeTransferFrom(TalentirNFT, _tokenId, _sender, address(this), _quantity);
