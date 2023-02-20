@@ -50,7 +50,7 @@ describe('TalentirNFT', function () {
       talentir.connect(luki).setMinterRole(minter.address)
     ).to.be.revertedWith('Ownable: caller is not the owner')
     await talentir.setMinterRole(minter.address)
-  });
+  })
 
   it('mints and burns', async function () {
     const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'

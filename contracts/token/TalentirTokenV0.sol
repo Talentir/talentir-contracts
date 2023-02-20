@@ -6,9 +6,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "./../utils/ERC2981.sol";
+import "operator-filter-registry/src/UpdatableOperatorFilterer.sol";
+import "operator-filter-registry/src/RevokableDefaultOperatorFilterer.sol";
 
 /// @custom:security-contact office@talentir.com
-contract TalentirTokenV0 is ERC1155(""), ERC2981, Ownable, Pausable {
+contract TalentirTokenV0 is ERC1155(""), ERC2981, RevokableDefaultOperatorFilterer, Ownable, Pausable {
     // - MEMBERS
     mapping(address => bool) public approvedMarketplaces;
     mapping(uint256 => string) private _tokenCIDs; // storing the IPFS CIDs
@@ -72,7 +74,7 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, Ownable, Pausable {
         string memory cid, // the IPFS CID of the content
         string memory contentID,
         address royaltyReceiver // the address to receive the royalty
-    ) public onlyMinter {
+    ) public onlyMinter whenNotPaused {
         uint256 tokenId = contentIdToTokenId(contentID);
         require(bytes(_tokenCIDs[tokenId]).length == 0, "Token already minted");
         _tokenCIDs[tokenId] = cid;
@@ -107,8 +109,8 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, Ownable, Pausable {
     /**
      * @notice Make sure the Talentir Marketplce is always approved to trade.
      */
-    function isApprovedForAll(address owner, address operator) public view virtual override returns (bool) {
-        return approvedMarketplaces[operator] == true || super.isApprovedForAll(owner, operator);
+    function isApprovedForAll(address localOwner, address operator) public view virtual override returns (bool) {
+        return approvedMarketplaces[operator] == true || super.isApprovedForAll(localOwner, operator);
     }
 
     function batchTransfer(
@@ -117,24 +119,13 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, Ownable, Pausable {
         uint256 id,
         uint256[] memory amounts,
         bytes memory data
-    ) public {
+    ) public onlyAllowedOperator(from) whenNotPaused {
         require(from == _msgSender() || isApprovedForAll(from, _msgSender()), "Caller is not token owner or approved");
         require(to.length == amounts.length, "Invalid array length");
 
         for (uint i = 0; i < to.length; i++) {
             _safeTransferFrom(from, to[i], id, amounts[i], data);
         }
-    }
-
-    function _beforeTokenTransfer(
-        address operator,
-        address from,
-        address to,
-        uint256[] memory ids,
-        uint256[] memory amounts,
-        bytes memory data
-    ) internal override whenNotPaused {
-        super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
     }
 
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC1155, ERC2981) returns (bool) {
@@ -144,5 +135,37 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, Ownable, Pausable {
     modifier onlyMinter() {
         require(_msgSender() == _minterAddress, "Not allowed");
         _;
+    }
+
+    // Functions to implement OpenSea's RevokableDefaultOperatorFilterer
+    function setApprovalForAll(
+        address operator,
+        bool approved
+    ) public override whenNotPaused onlyAllowedOperatorApproval(operator) {
+        super.setApprovalForAll(operator, approved);
+    }
+
+    function safeTransferFrom(
+        address from,
+        address to,
+        uint256 tokenId,
+        uint256 amount,
+        bytes memory data
+    ) public override onlyAllowedOperator(from) whenNotPaused {
+        super.safeTransferFrom(from, to, tokenId, amount, data);
+    }
+
+    function safeBatchTransferFrom(
+        address from,
+        address to,
+        uint256[] memory ids,
+        uint256[] memory amounts,
+        bytes memory data
+    ) public virtual override onlyAllowedOperator(from) whenNotPaused {
+        super.safeBatchTransferFrom(from, to, ids, amounts, data);
+    }
+
+    function owner() public view virtual override(Ownable, UpdatableOperatorFilterer) returns (address) {
+        return Ownable.owner();
     }
 }
