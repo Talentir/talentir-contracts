@@ -13,9 +13,12 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, Ownable, Pausable {
     mapping(address => bool) public approvedMarketplaces;
     mapping(uint256 => string) private _tokenCIDs; // storing the IPFS CIDs
     address private _minterAddress;
+    uint256 public constant TOKEN_FRACTIONS = 1_000_000;
 
     // - EVENTS
     event MarketplaceApproved(address marketplaceAddress, bool approved);
+    event RoyaltyPercentageChanged(uint256 percent);
+    event TalentChanged(address from, address to, uint256 tokenID);
 
     // - ADMIN FUNCTIONS
     // At the beginning, these are centralized with Talentir but should be handled by the
@@ -38,8 +41,9 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, Ownable, Pausable {
      * @notice Changing the royalty percentage of every sale. 1% = 1_000
      */
     function setRoyalty(uint256 percent) public onlyOwner {
-        require(percent <= 100_000, "Must be <= 100%");
-        _setRoyaltyPercent(percent);
+        require(percent <= 10_000, "Must be <= 10%");
+        _royaltyPercent = percent;
+        emit RoyaltyPercentageChanged(percent);
     }
 
     function setMinterRole(address minterAddress) public onlyOwner {
@@ -50,7 +54,7 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, Ownable, Pausable {
      * @notice Approve a new Marketplace Contract so users need less gas when selling and buying NFTs
      * on the Talentir contract.
      */
-    function setNftMarketplaceApproval(address marketplace, bool approval) public onlyOwner {
+    function approveNftMarketplace(address marketplace, bool approval) public onlyOwner {
         approvedMarketplaces[marketplace] = approval;
         emit MarketplaceApproved(marketplace, approval);
     }
@@ -74,16 +78,9 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, Ownable, Pausable {
     ) public onlyMinter {
         uint256 tokenId = contentIdToTokenId(contentID);
         require(bytes(_tokenCIDs[tokenId]).length == 0, "Token already minted");
-        _mint(to, tokenId, 1000000, "");
         _tokenCIDs[tokenId] = cid;
         _setTalent(tokenId, royaltyReceiver);
-    }
-
-    /**
-     * @notice Burn a token. This is only possible for the owner of the token.
-     */
-    function burn(address account, uint256 tokenID, uint256 value) public virtual onlyOwner {
-        _burn(account, tokenID, value);
+        _mint(to, tokenId, TOKEN_FRACTIONS, "");
     }
 
     function uri(uint256 tokenId) public view override returns (string memory) {
@@ -91,6 +88,18 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, Ownable, Pausable {
     }
 
     // - PUBLIC FUNCTIONS
+
+    function updateTalent(uint256 tokenId, address talent) public {
+        address currentReceiver = _talents[tokenId];
+        require(currentReceiver == msg.sender, "Royalty receiver must update");
+        _setTalent(tokenId, talent);
+    }
+
+    function _setTalent(uint256 tokenID, address talent) internal {
+        address from = _talents[tokenID];
+        _talents[tokenID] = talent;
+        emit TalentChanged(from, talent, tokenID);
+    }
 
     /**
      * @notice A pure function to calculate the tokenID from a given unique contentID. A contentID
@@ -110,11 +119,14 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, Ownable, Pausable {
         return approvedMarketplaces[operator] == true || super.isApprovedForAll(owner, operator);
     }
 
-    function batchTransfer (address from, address[] memory to, uint256 id, uint256[] memory amounts, bytes memory data) public {
-        require(
-            from == _msgSender() || isApprovedForAll(from, _msgSender()),
-            "Caller is not token owner or approved"
-        );
+    function batchTransfer(
+        address from,
+        address[] memory to,
+        uint256 id,
+        uint256[] memory amounts,
+        bytes memory data
+    ) public {
+        require(from == _msgSender() || isApprovedForAll(from, _msgSender()), "Caller is not token owner or approved");
         require(to.length == amounts.length, "Invalid array length");
 
         for (uint i = 0; i < to.length; i++) {
