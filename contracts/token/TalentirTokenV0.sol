@@ -6,11 +6,10 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "./../utils/ERC2981.sol";
-import "operator-filter-registry/src/UpdatableOperatorFilterer.sol";
-import "operator-filter-registry/src/RevokableDefaultOperatorFilterer.sol";
+import "operator-filter-registry/src/DefaultOperatorFilterer.sol";
 
 /// @custom:security-contact office@talentir.com
-contract TalentirTokenV0 is ERC1155(""), ERC2981, RevokableDefaultOperatorFilterer, Ownable, Pausable {
+contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownable, Pausable {
     // - MEMBERS
     mapping(address => bool) public approvedMarketplaces;
     mapping(uint256 => string) private _tokenCIDs; // storing the IPFS CIDs
@@ -171,9 +170,5 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, RevokableDefaultOperatorFilter
         bytes memory data
     ) public virtual override onlyAllowedOperator(from) whenNotPaused {
         super.safeBatchTransferFrom(from, to, ids, amounts, data);
-    }
-
-    function owner() public view virtual override(Ownable, UpdatableOperatorFilterer) returns (address) {
-        return Ownable.owner();
     }
 }
