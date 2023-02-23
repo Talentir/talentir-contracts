@@ -52,7 +52,7 @@ describe('TalentirNFT', function () {
     await talentir.setMinterRole(minter.address)
   })
 
-  it('mints and burns', async function () {
+  it('mints', async function () {
     const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
     const contentID1 = '1'
     const tokenID1 = await talentir.contentIdToTokenId(contentID1)
@@ -70,15 +70,6 @@ describe('TalentirNFT', function () {
         .connect(minter)
         .mint(luki.address, cid1, contentID1, luki.address)
     ).to.be.revertedWith('Token already minted')
-
-    await expect(
-      talentir.connect(luki).burn(luki.address, tokenID1, 1000)
-    ).to.be.revertedWith('Ownable: caller is not the owner')
-
-    await talentir.burn(luki.address, tokenID1, 1000)
-
-    const balance2 = await talentir.balanceOf(luki.address, tokenID1)
-    expect(balance2).to.equal(999_000)
   })
 
   it('can approve a marketplace to transfer tokens', async function () {
@@ -98,10 +89,10 @@ describe('TalentirNFT', function () {
     ).to.be.revertedWith('ERC1155: caller is not token owner or approved')
 
     await expect(
-      talentir.connect(luki).setNftMarketplaceApproval(johnny.address, true)
+      talentir.connect(luki).approveNftMarketplace(johnny.address, true)
     ).to.be.revertedWith('Ownable: caller is not the owner')
 
-    await talentir.setNftMarketplaceApproval(johnny.address, true)
+    await talentir.approveNftMarketplace(johnny.address, true)
 
     await talentir
       .connect(johnny)
@@ -149,9 +140,9 @@ describe('TalentirNFT', function () {
       .to.emit(talentir, 'TalentChanged')
       .withArgs(ethers.constants.AddressZero, johnny.address, tokenID1)
 
-    const result = await talentir.royaltyInfo(tokenID1, 100)
+    const result = await talentir.royaltyInfo(tokenID1, 1000)
     expect(result[0]).to.equal(johnny.address)
-    expect(result[1]).to.equal(10)
+    expect(result[1]).to.equal(75)
 
     // // Fail for non-existing royalty info
     await expect(talentir.connect(luki).royaltyInfo(1, 100)).to.be.reverted
@@ -159,15 +150,15 @@ describe('TalentirNFT', function () {
     await expect(
       talentir.connect(minter).setRoyalty(15_000)
     ).to.be.revertedWith('Ownable: caller is not the owner')
-    await expect(talentir.setRoyalty(101_000)).to.be.revertedWith(
-      'Must be <= 100%'
+    await expect(talentir.setRoyalty(10_001)).to.be.revertedWith(
+      'Must be <= 10%'
     )
 
-    await talentir.setRoyalty(15_000)
+    await talentir.setRoyalty(10_000)
 
     const result2 = await talentir.royaltyInfo(tokenID1, 100)
     expect(result2[0]).to.equal(johnny.address)
-    expect(result2[1]).to.equal(15)
+    expect(result2[1]).to.equal(10)
 
     await expect(talentir.updateTalent(tokenID1, luki.address)).to.be.reverted
     await expect(talentir.connect(luki).updateTalent(tokenID1, luki.address)).to
@@ -210,11 +201,6 @@ describe('TalentirNFT', function () {
         .connect(johnny)
         .safeTransferFrom(johnny.address, luki.address, tokenID1, 1, '0x')
     ).to.be.revertedWith('Pausable: paused')
-
-    //   // Burn should fail
-    await expect(talentir.burn(johnny.address, tokenID1, 1)).to.be.revertedWith(
-      'Pausable: paused'
-    )
 
     await talentir.unpause()
 

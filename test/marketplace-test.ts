@@ -65,7 +65,7 @@ describe('Marketplace Tests', function () {
     ).to.be.revertedWith('ERC1155: caller is not token owner or approved')
     // Grant allowance and make sell order
     await expect(
-      talentirNFT.setNftMarketplaceApproval(marketplace.address, true)
+      talentirNFT.approveNftMarketplace(marketplace.address, true)
     ).to.emit(talentirNFT, 'MarketplaceApproved')
     // Can't add orders with 0 quantity or price
     await expect(
@@ -208,7 +208,7 @@ describe('Marketplace Tests', function () {
   it('should distribute fees correctly', async function () {
     // Grant marketplace approval
     await expect(
-      talentirNFT.setNftMarketplaceApproval(marketplace.address, true)
+      talentirNFT.approveNftMarketplace(marketplace.address, true)
     ).to.emit(talentirNFT, 'MarketplaceApproved')
     // Mint token to seller
     await talentirNFT.mint(
@@ -290,7 +290,7 @@ describe('Marketplace Tests', function () {
     )
     // Grant allowance
     await expect(
-      talentirNFT.setNftMarketplaceApproval(marketplace.address, true)
+      talentirNFT.approveNftMarketplace(marketplace.address, true)
     ).to.emit(talentirNFT, 'MarketplaceApproved')
     // Add multiple buy and sell orders
     for (let i = 5; i <= 10; i++) {
@@ -425,7 +425,7 @@ describe('Marketplace Tests', function () {
       1000000
     )
     await expect(
-      talentirNFT.setNftMarketplaceApproval(marketplace.address, true)
+      talentirNFT.approveNftMarketplace(marketplace.address, true)
     ).to.emit(talentirNFT, 'MarketplaceApproved')
     await expect(marketplace.makeSellOrder(tokenId, oneEther, 1, true)).to.emit(
       marketplace,

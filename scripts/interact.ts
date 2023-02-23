@@ -12,7 +12,7 @@ async function main (): Promise<void> {
   const talentirMarketplaceFactory = new TalentirMarketplaceV0__factory(signer[0])
   const talentirMarketplace = talentirMarketplaceFactory.attach(marketplaceAddress)
 
-  const tx1 = await talentirNFT.setNftMarketplaceApproval(marketplaceAddress, true)
+  const tx1 = await talentirNFT.approveNftMarketplace(marketplaceAddress, true)
   console.log('TalentirNFT: Approved marketplace: ', marketplaceAddress, ' tx:', tx1.hash)
 
   // Grant the Openzeppelin Relay the Minter Role
