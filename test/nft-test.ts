@@ -202,6 +202,12 @@ describe('TalentirNFT', function () {
 
     await expect(
       talentir
+        .connect(minter)
+        .mintWithPresale(johnny.address, cid2, contentID2, ethers.constants.AddressZero)
+    ).to.be.revertedWith('Pausable: paused')
+
+    await expect(
+      talentir
         .connect(johnny)
         .safeTransferFrom(johnny.address, luki.address, tokenID1, 1, '0x')
     ).to.be.revertedWith('Pausable: paused')
@@ -326,5 +332,165 @@ describe('TalentirNFT', function () {
     await talentir
       .connect(johnny)
       .batchTransfer(luki.address, [johnny.address, admin.address], tokenID1, [1, 1], '0x')
+  })
+
+  it('handles minting with presale', async function () {
+    const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
+    const contentID1 = '1'
+    const tokenID1 = await talentir.contentIdToTokenId(contentID1)
+    const contentID2 = '2'
+    const tokenID2 = await talentir.contentIdToTokenId(contentID2)
+
+    await expect(
+      talentir
+        .mintWithPresale(luki.address, cid1, contentID1, luki.address)
+    ).to.be.revertedWith('Not allowed')
+
+    await expect(
+      talentir
+        .connect(minter)
+        .mintWithPresale(luki.address, cid1, contentID1, luki.address)
+    ).to.emit(talentir, 'TransferSingle')
+    await expect(
+      talentir
+        .connect(minter)
+        .mint(luki.address, contentID2, contentID2, luki.address)
+    ).to.emit(talentir, 'TransferSingle')
+
+    // Transfers should fail
+    await expect(
+      talentir
+        .connect(luki)
+        .safeTransferFrom(johnny.address, luki.address, tokenID1, 1, '0x')
+    ).to.be.revertedWith('Not allowed in presale')
+
+    await expect(
+      talentir
+        .connect(luki)
+        .batchTransfer(luki.address, [johnny.address, admin.address], tokenID1, [2, 3], '0x')
+    ).to.be.revertedWith('Not allowed in presale')
+
+    await expect(
+      talentir
+        .connect(luki)
+        .safeBatchTransferFrom(luki.address, johnny.address, [tokenID1, tokenID2], [2, 3], '0x')).to.be.revertedWith('Not allowed in presale')
+
+    // Only owner can set global presale allowance
+    await expect(
+      talentir
+        .connect(luki)
+        .setGlobalPresaleAllowance(luki.address, true)
+    ).to.be.revertedWith('Ownable: caller is not the owner')
+
+    await expect(
+      talentir
+        .setGlobalPresaleAllowance(luki.address, true)
+    ).to.emit(talentir, 'GlobalPresaleAllowanceSet')
+
+    // Transfers work now
+    await talentir
+      .connect(luki)
+      .safeTransferFrom(luki.address, luki.address, tokenID1, 1, '0x')
+
+    await talentir
+      .connect(luki)
+      .batchTransfer(luki.address, [luki.address, admin.address], tokenID1, [2, 3], '0x')
+
+    await talentir
+      .connect(luki)
+      .safeBatchTransferFrom(luki.address, johnny.address, [tokenID1, tokenID2], [2, 3], '0x')
+
+    // Remove global presale allowance
+    await expect(
+      talentir
+        .setGlobalPresaleAllowance(luki.address, true)
+    ).to.be.revertedWith('Already set')
+
+    await expect(
+      talentir
+        .setGlobalPresaleAllowance(luki.address, false)
+    ).to.emit(talentir, 'GlobalPresaleAllowanceSet')
+
+    // Transfers fail again
+    await expect(
+      talentir
+        .connect(luki)
+        .safeTransferFrom(johnny.address, luki.address, tokenID1, 1, '0x')
+    ).to.be.revertedWith('Not allowed in presale')
+
+    await expect(
+      talentir
+        .connect(luki)
+        .batchTransfer(luki.address, [johnny.address, admin.address], tokenID1, [2, 3], '0x')
+    ).to.be.revertedWith('Not allowed in presale')
+
+    await expect(
+      talentir
+        .connect(luki)
+        .safeBatchTransferFrom(luki.address, johnny.address, [tokenID1, tokenID2], [2, 3], '0x')).to.be.revertedWith('Not allowed in presale')
+
+    // Only owner can set token presale allowance
+    await expect(
+      talentir
+        .connect(luki)
+        .setTokenPresaleAllowance(luki.address, tokenID1, true)
+    ).to.be.revertedWith('Ownable: caller is not the owner')
+
+    await expect(
+      talentir
+        .setTokenPresaleAllowance(luki.address, tokenID1, true)
+    ).to.emit(talentir, 'TokenPresaleAllowanceSet')
+
+    await expect(
+      talentir
+        .setTokenPresaleAllowance(luki.address, tokenID2, true)
+    ).to.emit(talentir, 'TokenPresaleAllowanceSet')
+
+    // Transfers work again
+    await talentir
+      .connect(luki)
+      .safeTransferFrom(luki.address, luki.address, tokenID1, 1, '0x')
+
+    await talentir
+      .connect(luki)
+      .batchTransfer(luki.address, [luki.address, admin.address], tokenID1, [2, 3], '0x')
+
+    await talentir
+      .connect(luki)
+      .safeBatchTransferFrom(luki.address, johnny.address, [tokenID1, tokenID2], [2, 3], '0x')
+
+    // Remove token presale allowance
+    await expect(
+      talentir
+        .setTokenPresaleAllowance(luki.address, tokenID1, true)
+    ).to.be.revertedWith('Already set')
+
+    await expect(
+      talentir
+        .setTokenPresaleAllowance(luki.address, tokenID1, false)
+    ).to.emit(talentir, 'TokenPresaleAllowanceSet')
+
+    await expect(
+      talentir
+        .setTokenPresaleAllowance(luki.address, tokenID2, false)
+    ).to.emit(talentir, 'TokenPresaleAllowanceSet')
+
+    // Transfers fail again
+    await expect(
+      talentir
+        .connect(luki)
+        .safeTransferFrom(johnny.address, luki.address, tokenID1, 1, '0x')
+    ).to.be.revertedWith('Not allowed in presale')
+
+    await expect(
+      talentir
+        .connect(luki)
+        .batchTransfer(luki.address, [johnny.address, admin.address], tokenID1, [2, 3], '0x')
+    ).to.be.revertedWith('Not allowed in presale')
+
+    await expect(
+      talentir
+        .connect(luki)
+        .safeBatchTransferFrom(luki.address, johnny.address, [tokenID1, tokenID2], [2, 3], '0x')).to.be.revertedWith('Not allowed in presale')
   })
 })
