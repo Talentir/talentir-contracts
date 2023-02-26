@@ -55,6 +55,7 @@
   },
   "dependencies": {
     "@defi-wonderland/smock": "^2.3.4",
-    "hardhat-contract-sizer": "^2.6.1"
+    "hardhat-contract-sizer": "^2.6.1",
+    "operator-filter-registry": "^1.4.0"
   }
 }

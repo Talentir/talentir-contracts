@@ -56,14 +56,14 @@ const config: HardhatUserConfig = {
     enabled: process.env.REPORT_GAS !== undefined,
     currency: 'EUR',
     coinmarketcap: '2dfd2e2c-7816-4596-8a6d-c6faa14697ea',
-    token: 'ETH',
+    token: 'ETH'
   },
   etherscan: {
     apiKey: {
-      mainnet: process.env.ETHERSCAN_API_KEY ?? "",
-      goerli: process.env.ETHERSCAN_API_KEY ?? "",
-      arbitrumOne: process.env.ARBISCAN_API_KEY ?? "",
-      arbitrumGoerli: process.env.ARBISCAN_API_KEY ?? ""
+      mainnet: process.env.ETHERSCAN_API_KEY ?? '',
+      goerli: process.env.ETHERSCAN_API_KEY ?? '',
+      arbitrumOne: process.env.ARBISCAN_API_KEY ?? '',
+      arbitrumGoerli: process.env.ARBISCAN_API_KEY ?? ''
     }
   }
 }

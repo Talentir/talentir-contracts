@@ -3,7 +3,7 @@ import { TalentirMarketplaceV0__factory, TalentirTokenV0__factory } from '../typ
 
 async function main (): Promise<void> {
   const tokenAddress = '0x2195A9306d1B4Bb0B8d8709D4921f992a6a9D9a2'
-  const marketplaceAddress = '0x9e29471569af3cbAB99440cb07e3F96C57D1D5F0'
+  const marketplaceAddress = '0xa8251C1b5011C2EAfAE40653109EEa970D7a12A1'
 
   const signer = await ethers.getSigners()
   const talentirNFTFactory = new TalentirTokenV0__factory(signer[0])
