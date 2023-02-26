@@ -15,11 +15,16 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
     mapping(uint256 => string) private _tokenCIDs; // storing the IPFS CIDs
     address private _minterAddress;
     uint256 public constant TOKEN_FRACTIONS = 1_000_000;
+    mapping(uint256 => bool) public isOnPresale;
+    mapping(address => bool) internal hasGlobalPresaleAllowance;
+    mapping(address => mapping(uint256 => bool)) internal hasTokenPresaleAllowance;
 
     // - EVENTS
     event MarketplaceApproved(address marketplaceAddress, bool approved);
     event RoyaltyPercentageChanged(uint256 percent);
     event TalentChanged(address from, address to, uint256 tokenID);
+    event GlobalPresaleAllowanceSet(address user, bool allowance);
+    event TokenPresaleAllowanceSet(address user, uint256 id, bool allowance);
 
     // - ADMIN FUNCTIONS
     // At the beginning, these are centralized with Talentir but should be handled by the
@@ -49,6 +54,18 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
 
     function setMinterRole(address minterAddress) public onlyOwner {
         _minterAddress = minterAddress;
+    }
+
+    function setGlobalPresaleAllowance(address user, bool allowance) public onlyOwner {
+        require(hasGlobalPresaleAllowance[user] != allowance, "Already set");
+        hasGlobalPresaleAllowance[user] = allowance;
+        emit GlobalPresaleAllowanceSet(user, allowance);
+    }
+
+    function setTokenPresaleAllowance(address user, uint256 tokenId, bool allowance) public onlyOwner {
+        require(hasTokenPresaleAllowance[user][tokenId] != allowance, "Already set");
+        hasTokenPresaleAllowance[user][tokenId] = allowance;
+        emit TokenPresaleAllowanceSet(user, tokenId, allowance);
     }
 
     /**
@@ -82,6 +99,17 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
         _tokenCIDs[tokenId] = cid;
         _setTalent(tokenId, royaltyReceiver);
         _mint(to, tokenId, TOKEN_FRACTIONS, "");
+    }
+
+    function mintWithPresale(
+        address to, // the address to mint the token to
+        string memory cid, // the IPFS CID of the content
+        string memory contentID,
+        address royaltyReceiver // the address to receive the royalty
+    ) public onlyMinter whenNotPaused {
+        uint256 tokenId = contentIdToTokenId(contentID);
+        isOnPresale[tokenId] = true;
+        mint(to, cid, contentID, royaltyReceiver);
     }
 
     function uri(uint256 tokenId) public view override returns (string memory) {
@@ -120,6 +148,35 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
         return approvedMarketplaces[operator] == true || super.isApprovedForAll(localOwner, operator);
     }
 
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC1155, ERC2981) returns (bool) {
+        return super.supportsInterface(interfaceId);
+    }
+
+    modifier onlyMinter() {
+        require(_msgSender() == _minterAddress, "Not allowed");
+        _;
+    }
+
+    function _checkPresale(address sender, uint256 tokenId) internal view {
+        bool isAllowed = true;
+        if (isOnPresale[tokenId]) {
+            if (!hasGlobalPresaleAllowance[sender]) {
+                if (!hasTokenPresaleAllowance[sender][tokenId]) {
+                    isAllowed = false;
+                }
+            }
+        }
+        require(isAllowed, "Not allowed in presale");
+    }
+
+    // Functions to implement OpenSea's RevokableDefaultOperatorFilterer
+    function setApprovalForAll(
+        address operator,
+        bool approved
+    ) public override whenNotPaused onlyAllowedOperatorApproval(operator) {
+        super.setApprovalForAll(operator, approved);
+    }
+
     function batchTransfer(
         address from,
         address[] memory to,
@@ -131,25 +188,9 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
         require(to.length == amounts.length, "Invalid array length");
 
         for (uint i = 0; i < to.length; i++) {
+            _checkPresale(from, id);
             _safeTransferFrom(from, to[i], id, amounts[i], data);
         }
-    }
-
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC1155, ERC2981) returns (bool) {
-        return super.supportsInterface(interfaceId);
-    }
-
-    modifier onlyMinter() {
-        require(_msgSender() == _minterAddress, "Not allowed");
-        _;
-    }
-
-    // Functions to implement OpenSea's RevokableDefaultOperatorFilterer
-    function setApprovalForAll(
-        address operator,
-        bool approved
-    ) public override whenNotPaused onlyAllowedOperatorApproval(operator) {
-        super.setApprovalForAll(operator, approved);
     }
 
     function safeTransferFrom(
@@ -159,6 +200,7 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
         uint256 amount,
         bytes memory data
     ) public override onlyAllowedOperator(from) whenNotPaused {
+        _checkPresale(from, tokenId);
         super.safeTransferFrom(from, to, tokenId, amount, data);
     }
 
@@ -169,6 +211,9 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
         uint256[] memory amounts,
         bytes memory data
     ) public virtual override onlyAllowedOperator(from) whenNotPaused {
+        for (uint i = 0; i < ids.length; i++) {
+            _checkPresale(from, ids[i]);
+        }
         super.safeBatchTransferFrom(from, to, ids, amounts, data);
     }
 }
