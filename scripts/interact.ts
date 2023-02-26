@@ -1,5 +1,6 @@
 import { ethers } from 'hardhat'
-import { TalentirMarketplaceV0__factory, TalentirTokenV0__factory } from '../typechain-types'
+import { TalentirTokenV0__factory } from '../typechain-types'
+// import { TalentirMarketplaceV0__factory } from '../typechain-types'
 
 async function main (): Promise<void> {
   const tokenAddress = '0x2195A9306d1B4Bb0B8d8709D4921f992a6a9D9a2'
@@ -9,8 +10,8 @@ async function main (): Promise<void> {
   const talentirNFTFactory = new TalentirTokenV0__factory(signer[0])
   const talentirNFT = talentirNFTFactory.attach(tokenAddress)
 
-  const talentirMarketplaceFactory = new TalentirMarketplaceV0__factory(signer[0])
-  const talentirMarketplace = talentirMarketplaceFactory.attach(marketplaceAddress)
+  // const talentirMarketplaceFactory = new TalentirMarketplaceV0__factory(signer[0])
+  // const talentirMarketplace = talentirMarketplaceFactory.attach(marketplaceAddress)
 
   const tx1 = await talentirNFT.approveNftMarketplace(marketplaceAddress, true)
   console.log('TalentirNFT: Approved marketplace: ', marketplaceAddress, ' tx:', tx1.hash)
