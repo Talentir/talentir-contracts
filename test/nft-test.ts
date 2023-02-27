@@ -73,7 +73,6 @@ describe('TalentirNFT', function () {
   })
 
   it('can approve a marketplace to transfer tokens', async function () {
-    const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
     const contentID1 = '1'
     const tokenID1 = await talentir.contentIdToTokenId(contentID1)
 
@@ -103,7 +102,6 @@ describe('TalentirNFT', function () {
   })
 
   it('can approve an account to transfer tokens', async function () {
-    const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
     const contentID1 = '1'
     const tokenID1 = await talentir.contentIdToTokenId(contentID1)
 
@@ -128,7 +126,7 @@ describe('TalentirNFT', function () {
     expect(balance).to.equal(1)
   })
 
-  it('Royalties', async function () {
+  it('pays out royalties', async function () {
     const contentID = 'contentID'
     const tokenID1 = await talentir.contentIdToTokenId(contentID)
 
@@ -170,12 +168,14 @@ describe('TalentirNFT', function () {
       .withArgs(johnny.address, luki.address, tokenID1)
   })
 
-  it('Pause', async function () {
+  it('allows pausing', async function () {
     const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
     const cid2 = 'QmPRRnZcj3PeWi8nDnM94KnbfsW5pscoY16B25YxCd7NWA'
     const contentID1 = '1'
     const contentID2 = '2'
+    const contentID3 = '3'
     const tokenID1 = await talentir.contentIdToTokenId(contentID1)
+    const tokenID2 = await talentir.contentIdToTokenId(contentID2)
 
     await talentir.setMinterRole(minter.address)
 
@@ -183,24 +183,47 @@ describe('TalentirNFT', function () {
       .connect(minter)
       .mint(johnny.address, cid1, contentID1, ethers.constants.AddressZero)
 
+    await talentir
+      .connect(minter)
+      .mint(johnny.address, contentID3, contentID3, luki.address)
+
     await expect(talentir.connect(minter).pause()).to.be.revertedWith(
       'Ownable: caller is not the owner'
     )
+
+    // Pause: everything should fail
     await talentir.pause()
 
-    // Mint should fail
     await expect(
       talentir
         .connect(minter)
         .mint(johnny.address, cid2, contentID2, ethers.constants.AddressZero)
     ).to.be.revertedWith('Pausable: paused')
 
-    // Transfer should fail
     await expect(
       talentir
         .connect(johnny)
         .safeTransferFrom(johnny.address, luki.address, tokenID1, 1, '0x')
     ).to.be.revertedWith('Pausable: paused')
+
+    await expect(
+      talentir
+        .connect(johnny)
+        .batchTransfer(luki.address, [johnny.address, admin.address], tokenID1, [2, 3], '0x')
+    ).to.be.revertedWith('Pausable: paused')
+
+    await expect(
+      talentir
+        .connect(johnny)
+        .safeBatchTransferFrom(luki.address, johnny.address, [tokenID1, tokenID2], [2, 3], '0x')).to.be.revertedWith('Pausable: paused')
+
+    await expect(talentir.setApprovalForAll(johnny.address, true)).to.be.revertedWith('Pausable: paused')
+    // Only owner can unpause
+    await expect(
+      talentir
+        .connect(johnny)
+        .unpause()
+    ).to.be.revertedWith('Ownable: caller is not the owner')
 
     await talentir.unpause()
 
@@ -212,7 +235,7 @@ describe('TalentirNFT', function () {
     ).not.to.be.reverted
   })
 
-  it('Interface', async function () {
+  it('responds with its interfaces', async function () {
     const data: BytesLike[] = []
     data.push('0x01ffc9a7') // IERC165
     data.push('0xd9b67a26') // IERC1155
@@ -223,7 +246,7 @@ describe('TalentirNFT', function () {
     }
   })
 
-  it('Set Talent', async function () {
+  it('allows setting talents', async function () {
     const contentID = 'contentID'
     const tokenID1 = await talentir.contentIdToTokenId(contentID)
 
@@ -246,5 +269,62 @@ describe('TalentirNFT', function () {
     await expect(talentir.connect(johnny).updateTalent(tokenID1, luki.address))
       .to.emit(talentir, 'TalentChanged')
       .withArgs(johnny.address, luki.address, tokenID1)
+  })
+
+  it('makes batch transfers', async function () {
+    // batch transfer of a single token to multiple wallets
+    const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
+    const contentID1 = '1'
+    const tokenID1 = await talentir.contentIdToTokenId(contentID1)
+    await expect(
+      talentir
+        .connect(minter)
+        .mint(luki.address, cid1, contentID1, luki.address)
+    ).to.emit(talentir, 'TransferSingle')
+
+    await talentir
+      .connect(luki)
+      .batchTransfer(luki.address, [johnny.address, admin.address], tokenID1, [2, 3], '0x')
+
+    expect(await talentir.balanceOf(luki.address, tokenID1)).to.equal(999_995)
+    expect(await talentir.balanceOf(johnny.address, tokenID1)).to.equal(2)
+    expect(await talentir.balanceOf(admin.address, tokenID1)).to.equal(3)
+
+    // invalid calls fail
+    await expect(
+      talentir
+        .connect(johnny)
+        .batchTransfer(luki.address, [johnny.address, admin.address], tokenID1, [2, 3], '0x')
+    ).to.be.revertedWith('Caller is not token owner or approved')
+
+    await expect(
+      talentir
+        .connect(luki)
+        .batchTransfer(luki.address, [johnny.address, admin.address], tokenID1, [2, 3, 4], '0x')
+    ).to.be.revertedWith('Invalid array length')
+
+    // batch transfer of a multiple tokens to a single wallet
+    const contentID2 = '2'
+    const tokenID2 = await talentir.contentIdToTokenId(contentID2)
+    await expect(
+      talentir
+        .connect(minter)
+        .mint(luki.address, contentID2, contentID2, luki.address)
+    ).to.emit(talentir, 'TransferSingle')
+    await talentir
+      .connect(luki)
+      .safeBatchTransferFrom(luki.address, johnny.address, [tokenID1, tokenID2], [2, 3], '0x')
+
+    expect(await talentir.balanceOf(luki.address, tokenID1)).to.equal(999_993)
+    expect(await talentir.balanceOf(johnny.address, tokenID1)).to.equal(4)
+    expect(await talentir.balanceOf(luki.address, tokenID2)).to.equal(999_997)
+    expect(await talentir.balanceOf(johnny.address, tokenID2)).to.equal(3)
+
+    // approved sender can transfer
+    await talentir.connect(luki).setApprovalForAll(johnny.address, true)
+
+    await talentir
+      .connect(johnny)
+      .batchTransfer(luki.address, [johnny.address, admin.address], tokenID1, [1, 1], '0x')
   })
 })
