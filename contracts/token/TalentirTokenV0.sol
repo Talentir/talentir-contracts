@@ -25,8 +25,52 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
     event TalentChanged(address from, address to, uint256 tokenID);
     event GlobalPresaleAllowanceSet(address user, bool allowance);
     event TokenPresaleAllowanceSet(address user, uint256 id, bool allowance);
+    event PresaleEnded(uint256 tokenId);
 
-    // - ADMIN FUNCTIONS
+    // - MODIFIERS
+    modifier onlyMinter() {
+        require(_msgSender() == _minterAddress, "Not allowed");
+        _;
+    }
+
+    // - PUBLIC FUNCTIONS
+
+    function uri(uint256 tokenId) public view override returns (string memory) {
+        return string(abi.encodePacked("ipfs://", _tokenCIDs[tokenId]));
+    }
+
+    function updateTalent(uint256 tokenId, address talent) public {
+        address currentReceiver = _talents[tokenId];
+        require(currentReceiver == msg.sender, "Royalty receiver must update");
+        _setTalent(tokenId, talent);
+    }
+
+    function _setTalent(uint256 tokenID, address talent) internal {
+        address from = _talents[tokenID];
+        _talents[tokenID] = talent;
+        emit TalentChanged(from, talent, tokenID);
+    }
+
+    /**
+     * @notice A pure function to calculate the tokenID from a given unique contentID. A contentID
+     * must be a unique identifier of the original content (such as a Youtube video ID)
+     */
+    function contentIdToTokenId(string memory contentID) public pure returns (uint256) {
+        return uint256(keccak256(abi.encodePacked((contentID))));
+    }
+
+    /**
+     * @notice Make sure the Talentir Marketplce is always approved to trade.
+     */
+    function isApprovedForAll(address localOwner, address operator) public view virtual override returns (bool) {
+        return approvedMarketplaces[operator] == true || super.isApprovedForAll(localOwner, operator);
+    }
+
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC1155, ERC2981) returns (bool) {
+        return super.supportsInterface(interfaceId);
+    }
+
+    // - ONLYOWNER FUNCTIONS
     // At the beginning, these are centralized with Talentir but should be handled by the
     // DAO in the future.
 
@@ -54,18 +98,6 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
 
     function setMinterRole(address minterAddress) public onlyOwner {
         _minterAddress = minterAddress;
-    }
-
-    function setGlobalPresaleAllowance(address user, bool allowance) public onlyOwner {
-        require(hasGlobalPresaleAllowance[user] != allowance, "Already set");
-        hasGlobalPresaleAllowance[user] = allowance;
-        emit GlobalPresaleAllowanceSet(user, allowance);
-    }
-
-    function setTokenPresaleAllowance(address user, uint256 tokenId, bool allowance) public onlyOwner {
-        require(hasTokenPresaleAllowance[user][tokenId] != allowance, "Already set");
-        hasTokenPresaleAllowance[user][tokenId] = allowance;
-        emit TokenPresaleAllowanceSet(user, tokenId, allowance);
     }
 
     /**
@@ -112,63 +144,25 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
         mint(to, cid, contentID, royaltyReceiver);
     }
 
-    function uri(uint256 tokenId) public view override returns (string memory) {
-        return string(abi.encodePacked("ipfs://", _tokenCIDs[tokenId]));
+    function setGlobalPresaleAllowance(address user, bool allowance) public onlyMinter {
+        require(hasGlobalPresaleAllowance[user] != allowance, "Already set");
+        hasGlobalPresaleAllowance[user] = allowance;
+        emit GlobalPresaleAllowanceSet(user, allowance);
     }
 
-    // - PUBLIC FUNCTIONS
-
-    function updateTalent(uint256 tokenId, address talent) public {
-        address currentReceiver = _talents[tokenId];
-        require(currentReceiver == msg.sender, "Royalty receiver must update");
-        _setTalent(tokenId, talent);
+    function setTokenPresaleAllowance(address user, uint256 tokenId, bool allowance) public onlyMinter {
+        require(hasTokenPresaleAllowance[user][tokenId] != allowance, "Already set");
+        hasTokenPresaleAllowance[user][tokenId] = allowance;
+        emit TokenPresaleAllowanceSet(user, tokenId, allowance);
     }
 
-    function _setTalent(uint256 tokenID, address talent) internal {
-        address from = _talents[tokenID];
-        _talents[tokenID] = talent;
-        emit TalentChanged(from, talent, tokenID);
+    function endPresale(uint256 tokenId) public onlyMinter {
+        require(isOnPresale[tokenId], "Already ended");
+        isOnPresale[tokenId] = false;
+        emit PresaleEnded(tokenId);
     }
 
-    /**
-     * @notice A pure function to calculate the tokenID from a given unique contentID. A contentID
-     * must be a unique identifier of the original content (such as a Youtube video ID)
-     */
-    function contentIdToTokenId(string memory contentID) public pure returns (uint256) {
-        return uint256(keccak256(abi.encodePacked((contentID))));
-    }
-
-    // - UTILITY
-    // @notice Makre sure Token Transfers are impossible when paused.
-
-    /**
-     * @notice Make sure the Talentir Marketplce is always approved to trade.
-     */
-    function isApprovedForAll(address localOwner, address operator) public view virtual override returns (bool) {
-        return approvedMarketplaces[operator] == true || super.isApprovedForAll(localOwner, operator);
-    }
-
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC1155, ERC2981) returns (bool) {
-        return super.supportsInterface(interfaceId);
-    }
-
-    modifier onlyMinter() {
-        require(_msgSender() == _minterAddress, "Not allowed");
-        _;
-    }
-
-    function _checkPresale(address sender, uint256 tokenId) internal view {
-        bool isAllowed = true;
-        if (isOnPresale[tokenId]) {
-            if (!hasGlobalPresaleAllowance[sender]) {
-                if (!hasTokenPresaleAllowance[sender][tokenId]) {
-                    isAllowed = false;
-                }
-            }
-        }
-        require(isAllowed, "Not allowed in presale");
-    }
-
+    // - ONLYOPERATOR FUNCTIONS
     // Functions to implement OpenSea's RevokableDefaultOperatorFilterer
     function setApprovalForAll(
         address operator,
@@ -186,9 +180,9 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
     ) public onlyAllowedOperator(from) whenNotPaused {
         require(from == _msgSender() || isApprovedForAll(from, _msgSender()), "Caller is not token owner or approved");
         require(to.length == amounts.length, "Invalid array length");
+        _checkPresale(from, id);
 
         for (uint i = 0; i < to.length; i++) {
-            _checkPresale(from, id);
             _safeTransferFrom(from, to[i], id, amounts[i], data);
         }
     }
@@ -215,5 +209,18 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
             _checkPresale(from, ids[i]);
         }
         super.safeBatchTransferFrom(from, to, ids, amounts, data);
+    }
+
+    // - INTERNAL FUNCTIONS
+    function _checkPresale(address sender, uint256 tokenId) internal view {
+        bool isAllowed = true;
+        if (isOnPresale[tokenId]) {
+            if (!hasGlobalPresaleAllowance[sender]) {
+                if (!hasTokenPresaleAllowance[sender][tokenId]) {
+                    isAllowed = false;
+                }
+            }
+        }
+        require(isAllowed, "Not allowed in presale");
     }
 }

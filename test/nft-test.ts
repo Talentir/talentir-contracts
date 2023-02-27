@@ -351,10 +351,11 @@ describe('TalentirNFT', function () {
         .connect(minter)
         .mintWithPresale(luki.address, cid1, contentID1, luki.address)
     ).to.emit(talentir, 'TransferSingle')
+
     await expect(
       talentir
         .connect(minter)
-        .mint(luki.address, contentID2, contentID2, luki.address)
+        .mintWithPresale(luki.address, contentID2, contentID2, luki.address)
     ).to.emit(talentir, 'TransferSingle')
 
     // Transfers should fail
@@ -375,15 +376,16 @@ describe('TalentirNFT', function () {
         .connect(luki)
         .safeBatchTransferFrom(luki.address, johnny.address, [tokenID1, tokenID2], [2, 3], '0x')).to.be.revertedWith('Not allowed in presale')
 
-    // Only owner can set global presale allowance
+    // Only minter can set global presale allowance
     await expect(
       talentir
         .connect(luki)
         .setGlobalPresaleAllowance(luki.address, true)
-    ).to.be.revertedWith('Ownable: caller is not the owner')
+    ).to.be.revertedWith('Not allowed')
 
     await expect(
       talentir
+        .connect(minter)
         .setGlobalPresaleAllowance(luki.address, true)
     ).to.emit(talentir, 'GlobalPresaleAllowanceSet')
 
@@ -403,11 +405,13 @@ describe('TalentirNFT', function () {
     // Remove global presale allowance
     await expect(
       talentir
+        .connect(minter)
         .setGlobalPresaleAllowance(luki.address, true)
     ).to.be.revertedWith('Already set')
 
     await expect(
       talentir
+        .connect(minter)
         .setGlobalPresaleAllowance(luki.address, false)
     ).to.emit(talentir, 'GlobalPresaleAllowanceSet')
 
@@ -429,20 +433,22 @@ describe('TalentirNFT', function () {
         .connect(luki)
         .safeBatchTransferFrom(luki.address, johnny.address, [tokenID1, tokenID2], [2, 3], '0x')).to.be.revertedWith('Not allowed in presale')
 
-    // Only owner can set token presale allowance
+    // Only minter can set token presale allowance
     await expect(
       talentir
         .connect(luki)
         .setTokenPresaleAllowance(luki.address, tokenID1, true)
-    ).to.be.revertedWith('Ownable: caller is not the owner')
+    ).to.be.revertedWith('Not allowed')
 
     await expect(
       talentir
+        .connect(minter)
         .setTokenPresaleAllowance(luki.address, tokenID1, true)
     ).to.emit(talentir, 'TokenPresaleAllowanceSet')
 
     await expect(
       talentir
+        .connect(minter)
         .setTokenPresaleAllowance(luki.address, tokenID2, true)
     ).to.emit(talentir, 'TokenPresaleAllowanceSet')
 
@@ -462,16 +468,19 @@ describe('TalentirNFT', function () {
     // Remove token presale allowance
     await expect(
       talentir
+        .connect(minter)
         .setTokenPresaleAllowance(luki.address, tokenID1, true)
     ).to.be.revertedWith('Already set')
 
     await expect(
       talentir
+        .connect(minter)
         .setTokenPresaleAllowance(luki.address, tokenID1, false)
     ).to.emit(talentir, 'TokenPresaleAllowanceSet')
 
     await expect(
       talentir
+        .connect(minter)
         .setTokenPresaleAllowance(luki.address, tokenID2, false)
     ).to.emit(talentir, 'TokenPresaleAllowanceSet')
 
@@ -492,5 +501,43 @@ describe('TalentirNFT', function () {
       talentir
         .connect(luki)
         .safeBatchTransferFrom(luki.address, johnny.address, [tokenID1, tokenID2], [2, 3], '0x')).to.be.revertedWith('Not allowed in presale')
+
+    // End presale
+    await expect(
+      talentir
+        .endPresale(tokenID1)
+    ).to.be.revertedWith('Not allowed')
+
+    await expect(
+      talentir
+        .connect(minter)
+        .endPresale(tokenID1)
+    ).to.emit(talentir, 'PresaleEnded')
+
+    await expect(
+      talentir
+        .connect(minter)
+        .endPresale(tokenID2)
+    ).to.emit(talentir, 'PresaleEnded')
+
+    // Transfers work again
+    await talentir
+      .connect(luki)
+      .safeTransferFrom(luki.address, luki.address, tokenID1, 1, '0x')
+
+    await talentir
+      .connect(luki)
+      .batchTransfer(luki.address, [luki.address, admin.address], tokenID1, [2, 3], '0x')
+
+    await talentir
+      .connect(luki)
+      .safeBatchTransferFrom(luki.address, johnny.address, [tokenID1, tokenID2], [2, 3], '0x')
+
+    // Can't end presale again
+    await expect(
+      talentir
+        .connect(minter)
+        .endPresale(tokenID1)
+    ).to.be.revertedWith('Already ended')
   })
 })
