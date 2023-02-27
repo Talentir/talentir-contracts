@@ -193,9 +193,9 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
     ) public onlyAllowedOperator(from) whenNotPaused {
         require(from == _msgSender() || isApprovedForAll(from, _msgSender()), "Caller is not token owner or approved");
         require(to.length == amounts.length, "Invalid array length");
+        _checkPresale(from, id);
 
         for (uint i = 0; i < to.length; i++) {
-            _checkPresale(from, id);
             _safeTransferFrom(from, to[i], id, amounts[i], data);
         }
     }
