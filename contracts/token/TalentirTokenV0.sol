@@ -25,6 +25,7 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
     event TalentChanged(address from, address to, uint256 tokenID);
     event GlobalPresaleAllowanceSet(address user, bool allowance);
     event TokenPresaleAllowanceSet(address user, uint256 id, bool allowance);
+    event PresaleEnded(uint256 tokenId);
 
     // - ADMIN FUNCTIONS
     // At the beginning, these are centralized with Talentir but should be handled by the
@@ -66,6 +67,12 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
         require(hasTokenPresaleAllowance[user][tokenId] != allowance, "Already set");
         hasTokenPresaleAllowance[user][tokenId] = allowance;
         emit TokenPresaleAllowanceSet(user, tokenId, allowance);
+    }
+
+    function endPresale(uint256 tokenId) public onlyOwner {
+        require(isOnPresale[tokenId], "Already ended");
+        isOnPresale[tokenId] = false;
+        emit PresaleEnded(tokenId);
     }
 
     /**
