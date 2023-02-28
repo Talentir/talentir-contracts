@@ -62,56 +62,10 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
         return super.supportsInterface(interfaceId);
     }
 
-    // - TALENT FUNCTIONS
     function updateTalent(uint256 tokenId, address talent) public {
         address currentTalent = _talents[tokenId];
         require(currentTalent == msg.sender, "Talent must update");
         _setTalent(tokenId, talent);
-    }
-
-    function _setTalent(uint256 tokenID, address talent) internal {
-        address from = _talents[tokenID];
-        _talents[tokenID] = talent;
-        emit TalentChanged(from, talent, tokenID);
-    }
-
-    // - ONLYOWNER FUNCTIONS
-    // At the beginning, these are centralized with Talentir but should be handled by the
-    // DAO in the future.
-
-    /**
-     * @notice Pauses the transfer, minting and burning of Tokens. This is a security measure and
-     * allows disabling the contract when migrating to a new version.
-     */
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    /// @dev Unpause contract.
-    function unpause() external onlyOwner {
-        _unpause();
-    }
-
-    /**
-     * @notice Changing the royalty percentage of every sale. 1% = 1_000
-     */
-    function setRoyalty(uint256 percent) public onlyOwner {
-        require(percent <= 10_000, "Must be <= 10%");
-        _royaltyPercent = percent;
-        emit RoyaltyPercentageChanged(percent);
-    }
-
-    function setMinterRole(address minterAddress) public onlyOwner {
-        _minterAddress = minterAddress;
-    }
-
-    /**
-     * @notice Approve a new Marketplace Contract so users need less gas when selling and buying NFTs
-     * on the Talentir contract.
-     */
-    function approveNftMarketplace(address marketplace, bool approval) public onlyOwner {
-        approvedMarketplaces[marketplace] = approval;
-        emit MarketplaceApproved(marketplace, approval);
     }
 
     // - MINTER_ROLE FUNCTIONS
@@ -192,6 +146,45 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
         emit PresaleEnded(tokenId);
     }
 
+    // - ONLYOWNER FUNCTIONS
+    // At the beginning, these are centralized with Talentir but should be handled by the
+    // DAO in the future.
+
+    /**
+     * @notice Pauses the transfer, minting and burning of Tokens. This is a security measure and
+     * allows disabling the contract when migrating to a new version.
+     */
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// @dev Unpause contract.
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    /**
+     * @notice Changing the royalty percentage of every sale. 1% = 1_000
+     */
+    function setRoyalty(uint256 percent) public onlyOwner {
+        require(percent <= 10_000, "Must be <= 10%");
+        _royaltyPercent = percent;
+        emit RoyaltyPercentageChanged(percent);
+    }
+
+    function setMinterRole(address minterAddress) public onlyOwner {
+        _minterAddress = minterAddress;
+    }
+
+    /**
+     * @notice Approve a new Marketplace Contract so users need less gas when selling and buying NFTs
+     * on the Talentir contract.
+     */
+    function approveNftMarketplace(address marketplace, bool approval) public onlyOwner {
+        approvedMarketplaces[marketplace] = approval;
+        emit MarketplaceApproved(marketplace, approval);
+    }
+
     // - ONLYOPERATOR FUNCTIONS
     // Functions to implement OpenSea's DefaultOperatorFilterer
     function setApprovalForAll(
@@ -237,6 +230,13 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
             require(_hasNoPresaleOrAllowed(from, ids[i]), "Not allowed in presale");
         }
         super.safeBatchTransferFrom(from, to, ids, amounts, data);
+    }
+
+    // - INTERNAL FUNCTIONS
+    function _setTalent(uint256 tokenID, address talent) internal {
+        address from = _talents[tokenID];
+        _talents[tokenID] = talent;
+        emit TalentChanged(from, talent, tokenID);
     }
 
     function _hasNoPresaleOrAllowed(address sender, uint256 tokenId) internal view returns (bool) {
