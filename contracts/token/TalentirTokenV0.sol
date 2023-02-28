@@ -33,22 +33,14 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
         _;
     }
 
-    // - PUBLIC FUNCTIONS
+    modifier onlyNoPresaleOrAllowed(address sender, uint256 tokenId) {
+        require(_isNoPresaleOrAllowed(sender, tokenId), "Not allowed in presale");
+        _;
+    }
 
+    // - PUBLIC FUNCTIONS
     function uri(uint256 tokenId) public view override returns (string memory) {
         return string(abi.encodePacked("ipfs://", _tokenCIDs[tokenId]));
-    }
-
-    function updateTalent(uint256 tokenId, address talent) public {
-        address currentReceiver = _talents[tokenId];
-        require(currentReceiver == msg.sender, "Royalty receiver must update");
-        _setTalent(tokenId, talent);
-    }
-
-    function _setTalent(uint256 tokenID, address talent) internal {
-        address from = _talents[tokenID];
-        _talents[tokenID] = talent;
-        emit TalentChanged(from, talent, tokenID);
     }
 
     /**
@@ -68,6 +60,19 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
 
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC1155, ERC2981) returns (bool) {
         return super.supportsInterface(interfaceId);
+    }
+
+    // - TALENT FUNCTIONS
+    function updateTalent(uint256 tokenId, address talent) public {
+        address currentTalent = _talents[tokenId];
+        require(currentTalent == msg.sender, "Talent must update");
+        _setTalent(tokenId, talent);
+    }
+
+    function _setTalent(uint256 tokenID, address talent) internal {
+        address from = _talents[tokenID];
+        _talents[tokenID] = talent;
+        emit TalentChanged(from, talent, tokenID);
     }
 
     // - ONLYOWNER FUNCTIONS
@@ -118,44 +123,69 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
      * @param to The address to mint the token to.
      * @param cid IPFS CID of the content
      * @param contentID unique content ID, such as unique Youtube ID
-     * @param royaltyReceiver The address to receive the royalty for the token.
+     * @param talent The address to receive the trading royalty for the token.
      */
     function mint(
-        address to, // the address to mint the token to
-        string memory cid, // the IPFS CID of the content
+        address to,
+        string memory cid,
         string memory contentID,
-        address royaltyReceiver // the address to receive the royalty
+        address talent
     ) public onlyMinter whenNotPaused {
         uint256 tokenId = contentIdToTokenId(contentID);
         require(bytes(_tokenCIDs[tokenId]).length == 0, "Token already minted");
         _tokenCIDs[tokenId] = cid;
-        _setTalent(tokenId, royaltyReceiver);
+        _setTalent(tokenId, talent);
         _mint(to, tokenId, TOKEN_FRACTIONS, "");
     }
 
+    /**
+     * @notice Safely mint a new token with Presale. During presale, the Talentir can add
+     * addresses to the presale.
+     * @param to The address to mint the token to.
+     * @param cid IPFS CID of the content
+     * @param contentID unique content ID, such as unique Youtube ID
+     * @param talent The address to receive the trading royalty for the token.
+     */
     function mintWithPresale(
-        address to, // the address to mint the token to
-        string memory cid, // the IPFS CID of the content
+        address to,
+        string memory cid,
         string memory contentID,
-        address royaltyReceiver // the address to receive the royalty
+        address talent
     ) public onlyMinter whenNotPaused {
         uint256 tokenId = contentIdToTokenId(contentID);
         isOnPresale[tokenId] = true;
-        mint(to, cid, contentID, royaltyReceiver);
+        mint(to, cid, contentID, talent);
     }
 
+    /**
+     * @notice Set the global presale allowance for a user. This allows the user to buy any token
+     * on presale.
+     * @param user The user to set the allowance for.
+     * @param allowance The allowance to set.
+     */
     function setGlobalPresaleAllowance(address user, bool allowance) public onlyMinter {
         require(hasGlobalPresaleAllowance[user] != allowance, "Already set");
         hasGlobalPresaleAllowance[user] = allowance;
         emit GlobalPresaleAllowanceSet(user, allowance);
     }
 
+    /**
+     * @notice Set the presale allowance for a user for a specific token. This allows the user to buy
+     * a specific token on presale.
+     * @param user The user to set the allowance for.
+     * @param tokenId The token to set the allowance for.
+     */
     function setTokenPresaleAllowance(address user, uint256 tokenId, bool allowance) public onlyMinter {
         require(hasTokenPresaleAllowance[user][tokenId] != allowance, "Already set");
         hasTokenPresaleAllowance[user][tokenId] = allowance;
         emit TokenPresaleAllowanceSet(user, tokenId, allowance);
     }
 
+    /**
+     * @notice End the presale for a token, so token can be transferred to anyone, presale can't be
+     * turned back on for the token
+     * @param tokenId The token to end the presale for.
+     */
     function endPresale(uint256 tokenId) public onlyMinter {
         require(isOnPresale[tokenId], "Already ended");
         isOnPresale[tokenId] = false;
@@ -163,7 +193,7 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
     }
 
     // - ONLYOPERATOR FUNCTIONS
-    // Functions to implement OpenSea's RevokableDefaultOperatorFilterer
+    // Functions to implement OpenSea's DefaultOperatorFilterer
     function setApprovalForAll(
         address operator,
         bool approved
@@ -177,10 +207,9 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
         uint256 id,
         uint256[] memory amounts,
         bytes memory data
-    ) public onlyAllowedOperator(from) whenNotPaused {
+    ) public onlyAllowedOperator(from) whenNotPaused onlyNoPresaleOrAllowed(from, id) {
         require(from == _msgSender() || isApprovedForAll(from, _msgSender()), "Caller is not token owner or approved");
         require(to.length == amounts.length, "Invalid array length");
-        _checkPresale(from, id);
 
         for (uint i = 0; i < to.length; i++) {
             _safeTransferFrom(from, to[i], id, amounts[i], data);
@@ -193,8 +222,7 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
         uint256 tokenId,
         uint256 amount,
         bytes memory data
-    ) public override onlyAllowedOperator(from) whenNotPaused {
-        _checkPresale(from, tokenId);
+    ) public override onlyAllowedOperator(from) whenNotPaused onlyNoPresaleOrAllowed(from, tokenId) {
         super.safeTransferFrom(from, to, tokenId, amount, data);
     }
 
@@ -206,21 +234,24 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
         bytes memory data
     ) public virtual override onlyAllowedOperator(from) whenNotPaused {
         for (uint i = 0; i < ids.length; i++) {
-            _checkPresale(from, ids[i]);
+            require(_isNoPresaleOrAllowed(from, ids[i]), "Not allowed in presale");
         }
         super.safeBatchTransferFrom(from, to, ids, amounts, data);
     }
 
-    // - INTERNAL FUNCTIONS
-    function _checkPresale(address sender, uint256 tokenId) internal view {
-        bool isAllowed = true;
-        if (isOnPresale[tokenId]) {
-            if (!hasGlobalPresaleAllowance[sender]) {
-                if (!hasTokenPresaleAllowance[sender][tokenId]) {
-                    isAllowed = false;
-                }
-            }
+    function _isNoPresaleOrAllowed(address sender, uint256 tokenId) internal view returns (bool) {
+        if (!isOnPresale[tokenId]) {
+            return true;
         }
-        require(isAllowed, "Not allowed in presale");
+
+        if (hasGlobalPresaleAllowance[sender]) {
+            return true;
+        }
+
+        if (hasTokenPresaleAllowance[sender][tokenId]) {
+            return true;
+        }
+
+        return false;
     }
 }
