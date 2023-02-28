@@ -234,12 +234,12 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
         bytes memory data
     ) public virtual override onlyAllowedOperator(from) whenNotPaused {
         for (uint i = 0; i < ids.length; i++) {
-            require(_isNoPresaleOrAllowed(from, ids[i]), "Not allowed in presale");
+            require(_hasNoPresaleOrAllowed(from, ids[i]), "Not allowed in presale");
         }
         super.safeBatchTransferFrom(from, to, ids, amounts, data);
     }
 
-    function _isNoPresaleOrAllowed(address sender, uint256 tokenId) internal view returns (bool) {
+    function _hasNoPresaleOrAllowed(address sender, uint256 tokenId) internal view returns (bool) {
         if (!isOnPresale[tokenId]) {
             return true;
         }
