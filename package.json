@@ -8,7 +8,8 @@
     "script": "npx hardhat run",
     "coverage": "npx hardhat coverage",
     "gas": "REPORT_GAS=true npx hardhat test",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "deploy": "npx thirdweb@latest deploy"
   },
   "engines": {
     "node": ">=16.0.0"

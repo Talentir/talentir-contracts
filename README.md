@@ -12,8 +12,11 @@ The Token Contract adheres to the following standards:
   The royalty standard enables creators of NFTs to receive royalties on different marketplaces.
 - [Ownable](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable.sol)
   
-    The contract implements the `Ownable` protocol. This enables us to set royalties on OpenSea, while they don't support the ERC2981 royalty standard. [Source1](https://support.opensea.io/hc/en-us/articles/4403934341907-How-do-I-import-my-contract-automatically-
-) [Source2](https://www.youtube.com/watch?v=LHZC9wX3r0I)
+  The contract implements the `Ownable` protocol. This enables us to collect royalties for the artists
+
+- [Operator Filter Registry] (https://github.com/ProjectOpenSea/operator-filter-registry)
+
+  Currently some marketplaces don't respect royalties. An independent committee ([Creator Ownership Research Institute](https://corinstitute.co/)) identifies marketplaces that don't enforce royalties and adds them to a list that we block.
 
 ### Features
 - The ID of a Token is its `keccak256` hash of the unique `content ID` provided during mint.
@@ -28,13 +31,16 @@ The Token Contract adheres to the following standards:
 
 - Contract can be paused by owner. This is useful for socially upgrading the contract.
 
+- Contract adds a global and per-token pre-sale functionality. The minter address can add addresses to these lists and end the presale. Once the presale is over, it can't be reenabled.
+
 Note: Long-term, all admin functionality should be handled by a DAO and all mint functionality should be handled by a contract that uses oracles for decentrally verifying ownership.
 
 ## 2. Marketplace Contract (Order Book)
 
 ### Notes
 - Supports ERC1155 Tokens
-- Can be used with multiple NFT contracts
+- Can only be used with a single ERC1155 contract
+- Supports ERC2981 royalties
 - Native currency: ETH
 
 ## Development
@@ -51,25 +57,6 @@ npx hardhat help
 TS_NODE_FILES=true npx ts-node scripts/deploy.ts
 ```
 ### Talentir Deploy Process
-- Deploy TalentirNFT
 ```shell
-npx hardhat run scripts/deployTalentirNft.ts --network arbitrumGoerli
-npx hardhat run scripts/deployTalentirNft.ts --network localhost
+npm run deploy
 ```
-
-- Deploy TalentirMarketplace
-```shell
-npx hardhat run scripts/deployTalentirMarketplace.ts --network arbitrumGoerli
-npx hardhat run scripts/deployTalentirMarketplace.ts --network localhost
-```
-
-- Interact
-Edit `scripts/interact.ts` to make sure you are interacting with the correct deployment
-```shell
-npx hardhat run scripts/interact.ts --network arbitrumGoerli
-npx hardhat run scripts/interact.ts --network localhost
-```
-
-### Performance optimizations
-
-For faster runs of your tests and scripts, consider skipping ts-node's type checking by setting the environment variable `TS_NODE_TRANSPILE_ONLY` to `1` in hardhat's environment. For more details see [the documentation](https://hardhat.org/guides/typescript.html#performance-optimizations).

@@ -34,7 +34,7 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
     }
 
     modifier onlyNoPresaleOrAllowed(address sender, uint256 tokenId) {
-        require(_isNoPresaleOrAllowed(sender, tokenId), "Not allowed in presale");
+        require(_hasNoPresaleOrAllowed(sender, tokenId), "Not allowed in presale");
         _;
     }
 
