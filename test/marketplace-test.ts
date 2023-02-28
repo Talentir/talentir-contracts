@@ -247,7 +247,7 @@ describe('Marketplace Tests', function () {
     // Non-royalty-receiver can't update royalties
     await expect(
       talentirNFT.updateTalent(tokenId, seller.address)
-    ).to.be.revertedWith('Royalty receiver must update')
+    ).to.be.revertedWith('Talent must update')
     // Royalty-receiver can update royalties
     await expect(
       talentirNFT.connect(royaltyReceiver).updateTalent(tokenId, seller.address)

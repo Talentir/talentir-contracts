@@ -266,11 +266,11 @@ describe('TalentirNFT', function () {
 
     await expect(
       talentir.connect(luki).updateTalent(tokenID1, luki.address)
-    ).to.be.revertedWith('Royalty receiver must update')
+    ).to.be.revertedWith('Talent must update')
 
     await expect(
       talentir.updateTalent(tokenID1, luki.address)
-    ).to.be.revertedWith('Royalty receiver must update')
+    ).to.be.revertedWith('Talent must update')
 
     await expect(talentir.connect(johnny).updateTalent(tokenID1, luki.address))
       .to.emit(talentir, 'TalentChanged')
