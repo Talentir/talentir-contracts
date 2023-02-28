@@ -1,6 +1,6 @@
 # Talentir Smart Contracts
 
-## 1. Token Contract Spec
+## 1. Talentir Token Contract Spec
 ### Standard
 The Token Contract adheres to the following standards:
 
@@ -14,9 +14,9 @@ The Token Contract adheres to the following standards:
   
   The contract implements the `Ownable` protocol. This enables us to collect royalties for the artists
 
-- [Operator Filter Registry] (https://github.com/ProjectOpenSea/operator-filter-registry)
+- [Operator Filter Registry](https://github.com/ProjectOpenSea/operator-filter-registry)
 
-  Currently some marketplaces don't respect royalties. An independent committee ([Creator Ownership Research Institute](https://corinstitute.co/)) identifies marketplaces that don't enforce royalties and adds them to a list that we block.
+  Currently some marketplaces don't respect royalties. An independent committee ([Creator Ownership Research Institute](https://corinstitute.co/)) identifies marketplaces that don't enforce royalties and adds them to a list that we block. We can always turn the blocking off if it's abused.
 
 ### Features
 - The ID of a Token is its `keccak256` hash of the unique `content ID` provided during mint.
@@ -35,7 +35,7 @@ The Token Contract adheres to the following standards:
 
 Note: Long-term, all admin functionality should be handled by a DAO and all mint functionality should be handled by a contract that uses oracles for decentrally verifying ownership.
 
-## 2. Marketplace Contract (Order Book)
+## 2. Talentir Marketplace Contract (Order Book)
 
 ### Notes
 - Supports ERC1155 Tokens
@@ -45,17 +45,8 @@ Note: Long-term, all admin functionality should be handled by a DAO and all mint
 
 ## Development
 This project contains the Talentir Smart Contracts written in Solidity and tested in Typescript using Hardhat.
-Here are some commands to get started.
+See package.json for commands to run.
 
-```shell
-npx hardhat accounts
-npx hardhat compile
-npx hardhat clean
-npx hardhat test
-npx hardhat node
-npx hardhat help
-TS_NODE_FILES=true npx ts-node scripts/deploy.ts
-```
 ### Talentir Deploy Process
 ```shell
 npm run deploy
