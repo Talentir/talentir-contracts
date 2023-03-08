@@ -1,11 +1,12 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity 0.8.17;
 
-import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
-import "@openzeppelin/contracts/interfaces/IERC2981.sol";
+import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
+import {IERC2981} from "@openzeppelin/contracts/interfaces/IERC2981.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 /// @custom:security-contact security@talentir.com
-contract ERC2981 is ERC165, IERC2981 {
+contract TalentirERC2981 is ERC165, IERC2981 {
     mapping(uint256 => address) internal _talents;
     uint256 internal _royaltyPercent = 7_500;
     uint256 internal constant PERCENT = 100_000;

@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
-import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
-import "./../utils/ERC2981.sol";
-import "operator-filter-registry/src/DefaultOperatorFilterer.sol";
+import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+import {TalentirERC2981} from "./../utils/TalentirERC2981.sol";
+import {DefaultOperatorFilterer} from "operator-filter-registry/src/DefaultOperatorFilterer.sol";
 
 /// @custom:security-contact office@talentir.com
-contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownable, Pausable {
+contract TalentirTokenV0 is ERC1155(""), TalentirERC2981, DefaultOperatorFilterer, Ownable, Pausable {
     // - MEMBERS
     mapping(uint256 => string) private _tokenCIDs; // storing the IPFS CIDs
     address private _approvedMarketplace;
@@ -51,7 +51,9 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
         return uint256(keccak256(abi.encodePacked((contentID))));
     }
 
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC1155, ERC2981) returns (bool) {
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view virtual override(ERC1155, TalentirERC2981) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 
