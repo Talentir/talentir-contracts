@@ -125,18 +125,20 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         @dev Sender address must be able to receive Ether, otherwise funds may be lost (ony relevant if sent from a smart contract)
         @dev Does NOT work for ERC20!. 
         @dev can emit multiple OrderExecuted events. 
+        @param _for recipient who will receive the token (msg.sender must be approved to send token on behalf of _for)
         @param tokenId token Id (ERC1155)
         @param ETHquantity total ETH demanded (quantity*minimum price per unit)
         @param tokenQuantity how much to sell in total of token 
         @param addUnfilledOrderToOrderbook add order to order list at a limit price of WETHquantity/tokenQuantity if it can't be filled
      */
     function makeSellOrder(
+        address _for,
         uint256 tokenId,
         uint256 ETHquantity,
         uint256 tokenQuantity,
         bool addUnfilledOrderToOrderbook
     ) external whenNotPaused nonReentrant {
-        _makeOrder(tokenId, Side.SELL, ETHquantity, tokenQuantity, addUnfilledOrderToOrderbook);
+        _makeOrder(_for, tokenId, Side.SELL, ETHquantity, tokenQuantity, addUnfilledOrderToOrderbook);
     }
 
     /**
@@ -146,17 +148,19 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         @dev Sender address must be able to receive Ether, otherwise funds may be lost (ony relevant if sent from a smart contract)
         @dev Does NOT work for ERC20!. 
         @dev can emit multiple OrderExecuted events. 
+        @param _for recipient who will receive the token (can be different from msg.sender)
         @param tokenId token Id (ERC1155)
         @param tokenQuantity how much to buy in total of token 
         @param addUnfilledOrderToOrderbook add order to order list at a limit price of WETHquantity/tokenQuantity if it can't be filled
         @dev `msg.value` total ETH offered (quantity*maximum price per unit)
      */
     function makeBuyOrder(
+        address _for,
         uint256 tokenId,
         uint256 tokenQuantity,
         bool addUnfilledOrderToOrderbook
     ) external payable whenNotPaused nonReentrant {
-        _makeOrder(tokenId, Side.BUY, msg.value, tokenQuantity, addUnfilledOrderToOrderbook);
+        _makeOrder(_for, tokenId, Side.BUY, msg.value, tokenQuantity, addUnfilledOrderToOrderbook);
     }
 
     /**
@@ -219,6 +223,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
 
     /// @dev Make a limit order. Internally, all orders are limit orders to prevent frontrunning.
     function _makeOrder(
+        address _sender,
         uint256 _tokenId,
         Side _side,
         uint256 _ETHquantity,
@@ -247,7 +252,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
             } else {
                 quantityToBuy = orders[bestOrderId].quantity;
             }
-            ETHquantityExecuted = _executeOrder(bestOrderId, quantityToBuy);
+            ETHquantityExecuted = _executeOrder(_sender, bestOrderId, quantityToBuy);
             remainingQuantity -= quantityToBuy;
             if ((_side == Side.BUY) && !(_addOrderForRemaining)) {
                 _ETHquantity -= ETHquantityExecuted;
@@ -258,18 +263,22 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         }
         // If the order couldn't be filled, add the remaining quantity to buy orders
         if (_addOrderForRemaining && (remainingQuantity > 0)) {
-            _addOrder(_tokenId, _side, msg.sender, price, remainingQuantity);
+            _addOrder(_tokenId, _side, _sender, price, remainingQuantity);
         }
         // Refund any remaining ETH from a buy order not added to order book
         if ((_side == Side.BUY) && !(_addOrderForRemaining)) {
             require(msg.value >= _ETHquantity, "Couldn't refund"); // just to be safe - don't refund more than what was sent
             bool success;
-            (success, ) = msg.sender.call{value: _ETHquantity}("");
+            (success, ) = _sender.call{value: _ETHquantity}("");
         }
     }
 
     /// @dev Executes one atomic order (transfers tokens and removes order).
-    function _executeOrder(uint256 _orderId, uint256 _quantity) internal returns (uint256 ETHquantity) {
+    function _executeOrder(
+        address _sender,
+        uint256 _orderId,
+        uint256 _quantity
+    ) internal returns (uint256 ETHquantity) {
         // This is an optimization to avoid the famous "stack to deep" error.
         OrderExecutedLocals memory locals;
 
@@ -291,13 +300,13 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
 
         if (order.side == Side.BUY) {
             // Caller is the seller
-            locals.seller = msg.sender;
+            locals.seller = _sender;
             locals.buyer = order.sender;
-            locals.tokenSender = msg.sender;
+            locals.tokenSender = _sender;
         } else {
             // Caller is the buyer
             locals.seller = order.sender;
-            locals.buyer = msg.sender;
+            locals.buyer = _sender;
             locals.tokenSender = address(this);
         }
 
