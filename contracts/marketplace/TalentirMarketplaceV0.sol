@@ -2,23 +2,25 @@
 pragma solidity 0.8.17;
 
 /// CONTRACTS ///
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
+import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {ERC1155Holder} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 
 /// LIBRARIES ///
-import "./RBTLibrary.sol";
-import "./LinkedListLibrary.sol";
+import {RBTLibrary} from "./../utils/RBTLibrary.sol";
+import {LinkedListLibrary} from "./../utils/LinkedListLibrary.sol";
 
 /// INTERFACES ///
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
-import "@openzeppelin/contracts/interfaces/IERC2981.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import {IERC1155} from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
+import {IERC2981} from "@openzeppelin/contracts/interfaces/IERC2981.sol";
 
 /// TYPES ///
 import {Side, Order} from "./OrderTypes.sol";
 
+/// @custom:security-contact security@talentir.com
 contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Holder {
     /// LIBRARIES ///
     using RBTLibrary for RBTLibrary.Tree;
@@ -85,7 +87,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     /// CONSTRUCTOR ///
 
     constructor(address _talentirNFT) {
-        require(IERC165(_talentirNFT).supportsInterface(type(IERC2981).interfaceId)); // must implement ERC-2981 royalties standard
+        require(IERC165(_talentirNFT).supportsInterface(type(IERC2981).interfaceId), "Must implement IERC2981");
         talentirNFT = _talentirNFT;
     }
 
@@ -127,18 +129,18 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         @dev can emit multiple OrderExecuted events. 
         @param _for recipient who will receive the token (msg.sender must be approved to send token on behalf of _for)
         @param tokenId token Id (ERC1155)
-        @param ETHquantity total ETH demanded (quantity*minimum price per unit)
+        @param ethQuantity total ETH demanded (quantity*minimum price per unit)
         @param tokenQuantity how much to sell in total of token 
         @param addUnfilledOrderToOrderbook add order to order list at a limit price of WETHquantity/tokenQuantity if it can't be filled
      */
     function makeSellOrder(
         address _for,
         uint256 tokenId,
-        uint256 ETHquantity,
+        uint256 ethQuantity,
         uint256 tokenQuantity,
         bool addUnfilledOrderToOrderbook
     ) external whenNotPaused nonReentrant {
-        _makeOrder(_for, tokenId, Side.SELL, ETHquantity, tokenQuantity, addUnfilledOrderToOrderbook);
+        _makeOrder(_for, tokenId, Side.SELL, ethQuantity, tokenQuantity, addUnfilledOrderToOrderbook);
     }
 
     /**
@@ -226,7 +228,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         address _sender,
         uint256 _tokenId,
         Side _side,
-        uint256 _ETHquantity,
+        uint256 _ethQuantity,
         uint256 _tokenQuantity,
         bool _addOrderForRemaining
     ) internal {
@@ -236,13 +238,13 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
                 "Not allowed"
             );
         }
-        require(_ETHquantity > 0, "Price must be positive");
+        require(_ethQuantity > 0, "Price must be positive");
         require(_tokenQuantity > 0, "Token quantity must be positive");
-        uint256 price = _ETHquantity / _tokenQuantity;
+        uint256 price = _ethQuantity / _tokenQuantity;
         require(price > 0, "Rounding problem");
         uint256 bestPrice;
         uint256 bestOrderId;
-        uint256 ETHquantityExecuted;
+        uint256 ethQuantityExecuted;
         Side oppositeSide = _oppositeSide(_side);
         (bestOrderId, bestPrice) = getBestOrder(_tokenId, oppositeSide);
         // If possible, buy up to the specified price limit
@@ -258,10 +260,10 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
             } else {
                 quantityToBuy = orders[bestOrderId].quantity;
             }
-            ETHquantityExecuted = _executeOrder(_sender, bestOrderId, quantityToBuy);
+            ethQuantityExecuted = _executeOrder(_sender, bestOrderId, quantityToBuy);
             remainingQuantity -= quantityToBuy;
             if ((_side == Side.BUY) && !(_addOrderForRemaining)) {
-                _ETHquantity -= ETHquantityExecuted;
+                _ethQuantity -= ethQuantityExecuted;
             }
             if (remainingQuantity > 0) {
                 (bestOrderId, bestPrice) = getBestOrder(_tokenId, oppositeSide);
@@ -273,9 +275,9 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         }
         // Refund any remaining ETH from a buy order not added to order book
         if ((_side == Side.BUY) && !(_addOrderForRemaining)) {
-            require(msg.value >= _ETHquantity, "Couldn't refund"); // just to be safe - don't refund more than what was sent
+            require(msg.value >= _ethQuantity, "Couldn't refund"); // just to be safe - don't refund more than what was sent
             bool success;
-            (success, ) = _sender.call{value: _ETHquantity}("");
+            (success, ) = _sender.call{value: _ethQuantity}("");
         }
     }
 
@@ -284,7 +286,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         address _sender,
         uint256 _orderId,
         uint256 _quantity
-    ) internal returns (uint256 ETHquantity) {
+    ) internal returns (uint256 ethQuantity) {
         // This is an optimization to avoid the famous "stack to deep" error.
         OrderExecutedLocals memory locals;
 
