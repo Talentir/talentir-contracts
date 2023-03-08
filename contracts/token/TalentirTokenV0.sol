@@ -94,8 +94,6 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
         // Pre-approve minter role, so first sell order can automatically be executed at the end
         // of the countdown (can be revoked by talent)
         _setApprovalForAll(to, _minterAddress, true);
-
-        setApprovalForAll(to, true);
     }
 
     /**
