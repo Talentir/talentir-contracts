@@ -1,7 +1,0 @@
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
-
-PATH=$PATH:/usr/local/bin:/usr/local/sbin:/opt/homebrew/bin
-
-# npm run lint
-# npm run test
