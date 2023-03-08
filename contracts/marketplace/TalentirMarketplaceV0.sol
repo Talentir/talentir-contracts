@@ -230,6 +230,12 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         uint256 _tokenQuantity,
         bool _addOrderForRemaining
     ) internal {
+        if (_side == Side.SELL) {
+            require(
+                (_sender == msg.sender) || (IERC1155(talentirNFT).isApprovedForAll(_sender, msg.sender)),
+                "Not allowed"
+            );
+        }
         require(_ETHquantity > 0, "Price must be positive");
         require(_tokenQuantity > 0, "Token quantity must be positive");
         uint256 price = _ETHquantity / _tokenQuantity;

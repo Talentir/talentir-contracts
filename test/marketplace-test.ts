@@ -556,4 +556,52 @@ describe("Marketplace Tests", function () {
       [1, -1]
     );
   });
+
+  it("make orders on behalf of other accounts", async function () {
+    // Set royalties to 0 (tested separately)
+    await expect(talentirNFT.setRoyalty(0)).to.emit(
+      talentirNFT,
+      "RoyaltyPercentageChanged"
+    );
+    await talentirNFT.mint(
+      seller.address,
+      "abcd",
+      "abc",
+      royaltyReceiver.address
+    );
+    const tokenId = await talentirNFT.contentIdToTokenId("abc");
+    expect(await talentirNFT.balanceOf(seller.address, tokenId)).to.equal(
+      1_000_000
+    );
+    // Grant allowance
+    await expect(
+      talentirNFT.approveNftMarketplace(marketplace.address, true)
+    ).to.emit(talentirNFT, "MarketplaceApproved");
+    // Add order to orderbook
+    await expect(
+      marketplace
+        .connect(seller)
+        .makeSellOrder(seller.address, tokenId, oneEther, 1, true)
+    ).to.emit(marketplace, "OrderAdded");
+    // Other account can't add order
+    await expect(
+      marketplace.makeSellOrder(seller.address, tokenId, oneEther, 1, true)
+    ).to.be.revertedWith("Not allowed");
+    // Approve owner
+    await expect(
+      talentirNFT.connect(seller).setApprovalForAll(owner.address, true)
+    ).to.emit(talentirNFT, "ApprovalForAll");
+    // Owner can make sell offer on behalf of seller
+    await expect(
+      marketplace.makeSellOrder(seller.address, tokenId, oneEther, 1, true)
+    ).to.emit(marketplace, "OrderAdded");
+    // Revoke approval
+    await expect(
+      talentirNFT.connect(seller).setApprovalForAll(owner.address, false)
+    ).to.emit(talentirNFT, "ApprovalForAll");
+    // Can't add order again
+    await expect(
+      marketplace.makeSellOrder(seller.address, tokenId, oneEther, 1, true)
+    ).to.be.revertedWith("Not allowed");
+  });
 });
