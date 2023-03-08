@@ -11,8 +11,8 @@ import "operator-filter-registry/src/DefaultOperatorFilterer.sol";
 /// @custom:security-contact office@talentir.com
 contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownable, Pausable {
     // - MEMBERS
-    mapping(address => bool) public approvedMarketplaces;
     mapping(uint256 => string) private _tokenCIDs; // storing the IPFS CIDs
+    address private _approvedMarketplace;
     address private _minterAddress;
     uint256 public constant TOKEN_FRACTIONS = 1_000_000;
     mapping(uint256 => bool) public isOnPresale;
@@ -51,13 +51,6 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
         return uint256(keccak256(abi.encodePacked((contentID))));
     }
 
-    /**
-     * @notice Make sure the Talentir Marketplce is always approved to trade.
-     */
-    function isApprovedForAll(address localOwner, address operator) public view virtual override returns (bool) {
-        return approvedMarketplaces[operator] == true || super.isApprovedForAll(localOwner, operator);
-    }
-
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC1155, ERC2981) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
@@ -78,37 +71,31 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
      * @param cid IPFS CID of the content
      * @param contentID unique content ID, such as unique Youtube ID
      * @param talent The address to receive the trading royalty for the token.
+     * @param mintWithPresale Safely mint a new token with Presale. During presale, the Talentir can
+     * add addresses to the presale.
      */
     function mint(
         address to,
         string memory cid,
         string memory contentID,
-        address talent
+        address talent,
+        bool mintWithPresale
     ) public onlyMinter whenNotPaused {
         uint256 tokenId = contentIdToTokenId(contentID);
         require(bytes(_tokenCIDs[tokenId]).length == 0, "Token already minted");
+        isOnPresale[tokenId] = mintWithPresale;
         _tokenCIDs[tokenId] = cid;
         _setTalent(tokenId, talent);
         _mint(to, tokenId, TOKEN_FRACTIONS, "");
-    }
 
-    /**
-     * @notice Safely mint a new token with Presale. During presale, the Talentir can add
-     * addresses to the presale.
-     * @param to The address to mint the token to.
-     * @param cid IPFS CID of the content
-     * @param contentID unique content ID, such as unique Youtube ID
-     * @param talent The address to receive the trading royalty for the token.
-     */
-    function mintWithPresale(
-        address to,
-        string memory cid,
-        string memory contentID,
-        address talent
-    ) public onlyMinter whenNotPaused {
-        uint256 tokenId = contentIdToTokenId(contentID);
-        isOnPresale[tokenId] = true;
-        mint(to, cid, contentID, talent);
+        // Pre-approve marketplace contract (can be revoked by talent)
+        _setApprovalForAll(to, _approvedMarketplace, true);
+
+        // Pre-approve minter role, so first sell order can automatically be executed at the end
+        // of the countdown (can be revoked by talent)
+        _setApprovalForAll(to, _minterAddress, true);
+
+        setApprovalForAll(to, true);
     }
 
     /**
@@ -177,12 +164,10 @@ contract TalentirTokenV0 is ERC1155(""), ERC2981, DefaultOperatorFilterer, Ownab
     }
 
     /**
-     * @notice Approve a new Marketplace Contract so users need less gas when selling and buying NFTs
-     * on the Talentir contract.
+     * @notice Set the marketplace contract so users need one step less.
      */
-    function approveNftMarketplace(address marketplace, bool approval) public onlyOwner {
-        approvedMarketplaces[marketplace] = approval;
-        emit MarketplaceApproved(marketplace, approval);
+    function setMarketplace(address marketplace) public onlyOwner {
+        _approvedMarketplace = marketplace;
     }
 
     // - ONLYOPERATOR FUNCTIONS
