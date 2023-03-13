@@ -8,8 +8,8 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
 import {ERC1155Holder} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 
 /// LIBRARIES ///
-import {RBTLibrary} from "./../utils/RBTLibrary.sol";
-import {LinkedListLibrary} from "./../utils/LinkedListLibrary.sol";
+import {RBTLibrary} from "./utils/RBTLibrary.sol";
+import {LinkedListLibrary} from "./utils/LinkedListLibrary.sol";
 
 /// INTERFACES ///
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -17,11 +17,10 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {IERC1155} from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import {IERC2981} from "@openzeppelin/contracts/interfaces/IERC2981.sol";
 
-/// TYPES ///
-import {Side, Order} from "./OrderTypes.sol";
-
-/// @custom:security-contact security@talentir.com
-contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Holder {
+/// @title Talentir Marketplace Contract
+/// @author Christoph Siebenbrunner, Johannes Kares
+/// @custom:security-contact office@talentir.com
+contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Holder {
     /// LIBRARIES ///
     using RBTLibrary for RBTLibrary.Tree;
     using LinkedListLibrary for LinkedListLibrary.LinkedList;
@@ -30,6 +29,20 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     struct OrderBook {
         RBTLibrary.Tree priceTree;
         mapping(uint256 => LinkedListLibrary.LinkedList) orderList;
+    }
+
+    enum Side {
+        BUY,
+        SELL
+    }
+
+    struct Order {
+        uint256 orderId;
+        uint256 tokenId;
+        Side side;
+        address sender;
+        uint256 price;
+        uint256 quantity;
     }
 
     // This is used for a "stack to deep" error optimization
@@ -44,9 +57,7 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         uint256 talentirFee;
     }
 
-    /// CONTRACTS ///
-
-    /// STATE ///
+    /// MEMBERS ///
     /// @dev tokenId => Side => OrderBook
     mapping(uint256 => mapping(Side => OrderBook)) internal markets;
     /// @dev OrderId => Order
@@ -85,20 +96,18 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     event TalentirFeeSet(uint256 fee, address wallet);
 
     /// CONSTRUCTOR ///
-
     constructor(address _talentirNFT) {
         require(IERC165(_talentirNFT).supportsInterface(type(IERC2981).interfaceId), "Must implement IERC2981");
         talentirNFT = _talentirNFT;
     }
 
     /// VIEW FUNCTIONS ///
-    /**
-        @notice Return the best `_side` (buy=0, sell=1) order for token `_tokenId`
-        @dev Return the best `_side` (buy=0, sell=1) order for token `_tokenId`
-        @param _tokenId token Id (ERC1155)
-        @return uint256 Id of best order
-        @return uint256 price of best order
-     */
+
+    /// @notice Return the best `_side` (buy=0, sell=1) order for token `_tokenId`
+    /// @dev Return the best `_side` (buy=0, sell=1) order for token `_tokenId`
+    /// @param _tokenId token Id (ERC1155)
+    /// @return uint256 Id of best order
+    /// @return uint256 price of best order
     function getBestOrder(uint256 _tokenId, Side _side) public view returns (uint256, uint256) {
         uint256 price = _side == Side.BUY
             ? markets[_tokenId][_side].priceTree.last()
@@ -108,31 +117,27 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         return (bestOrderId, price);
     }
 
-    /**
-        @notice Computes the fee amount to be paid to Talentir for a transaction of size `_totalPaid`
-        @dev Computes the fee amount to be paid for a transaction of size `_totalPaid`. 
-        @param _totalPaid price*volume
-        @return uint256 fee 
-     */
+    ///   @notice Computes the fee amount to be paid to Talentir for a transaction of size `_totalPaid`
+    ///  @dev Computes the fee amount to be paid for a transaction of size `_totalPaid`.
+    ///   @param _totalPaid price*volume
+    ///   @return uint256 fee
     function calcTalentirFee(uint256 _totalPaid) public view returns (uint256) {
         return ((100 * talentirFeePercent * _totalPaid) / PERCENT) / 100;
     }
 
     /// PUBLIC FUNCTIONS ///
 
-    /**
-        @notice Sell `tokenQuantity` of token `tokenId` for min `ETHquantity` total price. (ERC1155)
-        @dev Sell `tokenQuantity` of token `tokenId` for min `ETHquantity` total price. (ERC1155)
-        @dev Price limit (`ETHquantity`) must always be included to prevent frontrunning. 
-        @dev Sender address must be able to receive Ether, otherwise funds may be lost (ony relevant if sent from a smart contract)
-        @dev Does NOT work for ERC20!. 
-        @dev can emit multiple OrderExecuted events. 
-        @param _for recipient who will receive the token (msg.sender must be approved to send token on behalf of _for)
-        @param tokenId token Id (ERC1155)
-        @param ethQuantity total ETH demanded (quantity*minimum price per unit)
-        @param tokenQuantity how much to sell in total of token 
-        @param addUnfilledOrderToOrderbook add order to order list at a limit price of WETHquantity/tokenQuantity if it can't be filled
-     */
+    /// @notice Sell `tokenQuantity` of token `tokenId` for min `ETHquantity` total price. (ERC1155)
+    /// @dev Sell `tokenQuantity` of token `tokenId` for min `ETHquantity` total price. (ERC1155)
+    /// @dev Price limit (`ETHquantity`) must always be included to prevent frontrunning.
+    /// @dev Sender address must be able to receive Ether, otherwise funds may be lost (ony relevant if sent from a smart contract)
+    /// @dev Does NOT work for ERC20!.
+    /// @dev can emit multiple OrderExecuted events.
+    /// @param _for recipient who will receive the token (msg.sender must be approved to send token on behalf of _for)
+    /// @param tokenId token Id (ERC1155)
+    /// @param ethQuantity total ETH demanded (quantity*minimum price per unit)
+    /// @param tokenQuantity how much to sell in total of token
+    /// @param addUnfilledOrderToOrderbook add order to order list at a limit price of WETHquantity/tokenQuantity if it can't be filled
     function makeSellOrder(
         address _for,
         uint256 tokenId,
@@ -143,19 +148,17 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         _makeOrder(_for, tokenId, Side.SELL, ethQuantity, tokenQuantity, addUnfilledOrderToOrderbook);
     }
 
-    /**
-        @notice Buy `tokenQuantity` of token `tokenId` for max `msg.value` total price.
-        @dev Buy `tokenQuantity` of token `tokenId` for max `msg.value` total price.
-        @dev Price limit must always be included to prevent frontrunning. 
-        @dev Sender address must be able to receive Ether, otherwise funds may be lost (ony relevant if sent from a smart contract)
-        @dev Does NOT work for ERC20!. 
-        @dev can emit multiple OrderExecuted events. 
-        @param _for recipient who will receive the token (can be different from msg.sender)
-        @param tokenId token Id (ERC1155)
-        @param tokenQuantity how much to buy in total of token 
-        @param addUnfilledOrderToOrderbook add order to order list at a limit price of WETHquantity/tokenQuantity if it can't be filled
-        @dev `msg.value` total ETH offered (quantity*maximum price per unit)
-     */
+    /// @notice Buy `tokenQuantity` of token `tokenId` for max `msg.value` total price.
+    /// @dev Buy `tokenQuantity` of token `tokenId` for max `msg.value` total price.
+    /// @dev Price limit must always be included to prevent frontrunning.
+    /// @dev Sender address must be able to receive Ether, otherwise funds may be lost (ony relevant if sent from a smart contract)
+    /// @dev Does NOT work for ERC20!.
+    /// @dev can emit multiple OrderExecuted events.
+    /// @param _for recipient who will receive the token (can be different from msg.sender)
+    /// @param tokenId token Id (ERC1155)
+    /// @param tokenQuantity how much to buy in total of token
+    /// @param addUnfilledOrderToOrderbook add order to order list at a limit price of WETHquantity/tokenQuantity if it can't be filled
+    /// @dev `msg.value` total ETH offered (quantity*maximum price per unit)
     function makeBuyOrder(
         address _for,
         uint256 tokenId,
@@ -165,12 +168,10 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         _makeOrder(_for, tokenId, Side.BUY, msg.value, tokenQuantity, addUnfilledOrderToOrderbook);
     }
 
-    /**
-        @notice Cancel orders: `orders`
-        @dev Cancel orders: `orders`. 
-        @dev emits OrdersCancelled event. 
-        @param orderIds array of order Ids
-     */
+    /// @notice Cancel orders: `orders`
+    /// @dev Cancel orders: `orders`.
+    /// @dev emits OrdersCancelled event.
+    /// @param orderIds array of order Ids
     function cancelOrders(uint256[] calldata orderIds) external nonReentrant {
         bool success;
         for (uint256 i = 0; i < orderIds.length; i++) {
@@ -202,13 +203,11 @@ contract TalentirMarketplaceV0 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         _unpause();
     }
 
-    /**
-        @dev Set the fee that Talentir will receive on each transaction.
-        @dev emits DefaultFeeSet event. 
-        @dev fee capped at 10%
-        @param _fee fee percent (100% = 100,000)
-        @param _wallet address where Talentir fee will be sent to
-     */
+    /// @dev Set the fee that Talentir will receive on each transaction.
+    /// @dev emits DefaultFeeSet event.
+    /// @dev fee capped at 10%
+    /// @param _fee fee percent (100% = 100,000)
+    /// @param _wallet address where Talentir fee will be sent to
     function setTalentirFee(uint256 _fee, address _wallet) external onlyOwner {
         require(_fee <= PERCENT / 10, "Must be <=10k"); // Talentir fee can never be higher than 10%
         talentirFeePercent = _fee;

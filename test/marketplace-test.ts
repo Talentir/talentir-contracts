@@ -2,11 +2,11 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
 // eslint-disable-next-line
-import { TalentirTokenV0, TalentirMarketplaceV0 } from "../typechain-types";
+import { TalentirTokenV1, TalentirMarketplaceV1 } from "../typechain-types";
 
 describe('Marketplace Tests', function () {
-  let talentirNFT: TalentirTokenV0
-  let marketplace: TalentirMarketplaceV0
+  let talentirNFT: TalentirTokenV1
+  let marketplace: TalentirMarketplaceV1
   let owner: SignerWithAddress
   let buyer: SignerWithAddress
   let seller: SignerWithAddress
@@ -21,12 +21,12 @@ describe('Marketplace Tests', function () {
     [owner, buyer, seller, royaltyReceiver, talentirFeeReceiver, sellAgent] =
       await ethers.getSigners()
     const TalentirNFTFactory = await ethers.getContractFactory(
-      'TalentirTokenV0'
+      'TalentirTokenV1'
     )
     talentirNFT = await TalentirNFTFactory.deploy()
     await talentirNFT.deployed()
     const MarketplaceFactory = await ethers.getContractFactory(
-      'TalentirMarketplaceV0'
+      'TalentirMarketplaceV1'
     )
     await expect(MarketplaceFactory.deploy(owner.address)).to.be.reverted
     marketplace = await MarketplaceFactory.deploy(talentirNFT.address)

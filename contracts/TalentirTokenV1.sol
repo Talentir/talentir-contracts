@@ -5,12 +5,14 @@ import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-import {TalentirERC2981} from "./../utils/TalentirERC2981.sol";
+import {TalentirERC2981} from "./utils/TalentirERC2981.sol";
 import {DefaultOperatorFilterer} from "operator-filter-registry/src/DefaultOperatorFilterer.sol";
 
+/// @title Talentir Token Contract
+/// @author Christoph Siebenbrunner, Johannes Kares
 /// @custom:security-contact office@talentir.com
-contract TalentirTokenV0 is ERC1155(""), TalentirERC2981, DefaultOperatorFilterer, Ownable, Pausable {
-    // - MEMBERS
+contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFilterer, Ownable, Pausable {
+    /// MEMBERS ///
     mapping(uint256 => string) private _tokenCIDs; // storing the IPFS CIDs
     address private _approvedMarketplace;
     address private _minterAddress;
@@ -19,7 +21,7 @@ contract TalentirTokenV0 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     mapping(address => bool) internal hasGlobalPresaleAllowance;
     mapping(address => mapping(uint256 => bool)) internal hasTokenPresaleAllowance;
 
-    // - EVENTS
+    /// EVENTS ///
     event MarketplaceApproved(address marketplaceAddress, bool approved);
     event RoyaltyPercentageChanged(uint256 percent);
     event TalentChanged(address from, address to, uint256 tokenID);
@@ -27,7 +29,7 @@ contract TalentirTokenV0 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     event TokenPresaleAllowanceSet(address user, uint256 id, bool allowance);
     event PresaleEnded(uint256 tokenId);
 
-    // - MODIFIERS
+    /// MODIFIERS ///
     modifier onlyMinter() {
         require(_msgSender() == _minterAddress, "Not allowed");
         _;
@@ -38,15 +40,17 @@ contract TalentirTokenV0 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
         _;
     }
 
-    // - PUBLIC FUNCTIONS
+    /// PUBLIC FUNCTIONS ///
+
+    /// @param tokenId The token ID to return the URI for.
+    /// @return The token URI for the given token ID.
     function uri(uint256 tokenId) public view override returns (string memory) {
         return string(abi.encodePacked("ipfs://", _tokenCIDs[tokenId]));
     }
 
-    /**
-     * @notice A pure function to calculate the tokenID from a given unique contentID. A contentID
-     * must be a unique identifier of the original content (such as a Youtube video ID)
-     */
+    /// @notice A pure function to calculate the tokenID from a given unique contentID. A contentID
+    /// @param contentID Must be a unique identifier of the original content (such as a Youtube video ID)
+    /// @return The token ID for the given content ID.
     function contentIdToTokenId(string memory contentID) public pure returns (uint256) {
         return uint256(keccak256(abi.encodePacked((contentID))));
     }
@@ -57,25 +61,33 @@ contract TalentirTokenV0 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
         return super.supportsInterface(interfaceId);
     }
 
+    /// @notice Update the talent address for a given token. This can only be called by the current
+    /// talent address.
+    /// @param tokenId The token ID to update the talent for.
+    /// @param talent The address to receive the trading royalty for the token.
     function updateTalent(uint256 tokenId, address talent) public {
         address currentTalent = _talents[tokenId];
         require(currentTalent == msg.sender, "Talent must update");
         _setTalent(tokenId, talent);
     }
 
-    // - MINTER_ROLE FUNCTIONS
+    /// @param tokenId The token ID to get the talent address for.
+    /// @return The address of the talent for the given token.
+    function getTalent(uint256 tokenId) public view returns (address) {
+        return _talents[tokenId];
+    }
 
-    /**
-     * @notice Safely mint a new token. The tokenId is calculated from the keccak256
-     * hash of the provided contentID. This ensures that no duplicate content can be
-     * minted.
-     * @param to The address to mint the token to.
-     * @param cid IPFS CID of the content
-     * @param contentID unique content ID, such as unique Youtube ID
-     * @param talent The address to receive the trading royalty for the token.
-     * @param mintWithPresale Safely mint a new token with Presale. During presale, the Talentir can
-     * add addresses to the presale.
-     */
+    /// MINTER FUNCTIONS ///
+
+    /// @notice Safely mint a new token. The tokenId is calculated from the keccak256
+    /// hash of the provided contentID. This ensures that no duplicate content can be
+    /// minted.
+    /// @param to The address to mint the token to.
+    /// @param cid IPFS CID of the content
+    /// @param contentID unique content ID, such as unique Youtube ID
+    /// @param talent The address to receive the trading royalty for the token.
+    /// @param mintWithPresale Safely mint a new token with Presale. During presale, the Talentir can
+    /// add addresses to the presale.
     function mint(
         address to,
         string memory cid,
@@ -98,80 +110,73 @@ contract TalentirTokenV0 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
         _setApprovalForAll(to, _minterAddress, true);
     }
 
-    /**
-     * @notice Set the global presale allowance for a user. This allows the user to buy any token
-     * on presale.
-     * @param user The user to set the allowance for.
-     * @param allowance The allowance to set.
-     */
+    /// @notice Set the global presale allowance for a user. This allows the user to buy
+    /// any token on presale.
+    /// @param user The user to set the allowance for.
+    /// @param allowance The allowance to set.
     function setGlobalPresaleAllowance(address user, bool allowance) public onlyMinter {
         require(hasGlobalPresaleAllowance[user] != allowance, "Already set");
         hasGlobalPresaleAllowance[user] = allowance;
         emit GlobalPresaleAllowanceSet(user, allowance);
     }
 
-    /**
-     * @notice Set the presale allowance for a user for a specific token. This allows the user to buy
-     * a specific token on presale.
-     * @param user The user to set the allowance for.
-     * @param tokenId The token to set the allowance for.
-     */
+    /// @notice Set the presale allowance for a user for a specific token. This allows the user to
+    /// transfer a specific token during presale.
+    /// @param user The user to set the allowance for.
+    /// @param tokenId The token to set the allowance for.
+    /// @param allowance The allowance to set.
     function setTokenPresaleAllowance(address user, uint256 tokenId, bool allowance) public onlyMinter {
         require(hasTokenPresaleAllowance[user][tokenId] != allowance, "Already set");
         hasTokenPresaleAllowance[user][tokenId] = allowance;
         emit TokenPresaleAllowanceSet(user, tokenId, allowance);
     }
 
-    /**
-     * @notice End the presale for a token, so token can be transferred to anyone, presale can't be
-     * turned back on for the token
-     * @param tokenId The token to end the presale for.
-     */
+    /// @notice End the presale for a token, so token can be transferred to anyone, presale can't be
+    /// turned back on for the token
+    /// @param tokenId The token to end the presale for.
     function endPresale(uint256 tokenId) public onlyMinter {
         require(isOnPresale[tokenId], "Already ended");
         isOnPresale[tokenId] = false;
         emit PresaleEnded(tokenId);
     }
 
-    // - ONLYOWNER FUNCTIONS
-    // At the beginning, these are centralized with Talentir but should be handled by the
-    // DAO in the future.
+    /// OWNER FUNCTIONS ///
+    /// At the beginning, these are centralized with Talentir but should be handled by the
+    /// DAO in the future.
 
-    /**
-     * @notice Pauses the transfer, minting and burning of Tokens. This is a security measure and
-     * allows disabling the contract when migrating to a new version.
-     */
+    /// @notice Pause contract.
     function pause() external onlyOwner {
         _pause();
     }
 
-    /// @dev Unpause contract.
+    /// @notice Unpause contract.
     function unpause() external onlyOwner {
         _unpause();
     }
 
-    /**
-     * @notice Changing the royalty percentage of every sale. 1% = 1_000
-     */
+    /// @notice Set the royalty percentage for all tokens.
+    /// @param percent The new royalty percentage. 1% = 1000.
     function setRoyalty(uint256 percent) public onlyOwner {
         require(percent <= 10_000, "Must be <= 10%");
         _royaltyPercent = percent;
         emit RoyaltyPercentageChanged(percent);
     }
 
+    /// @notice Set the minter address.
+    /// @param minterAddress The new minter address.
     function setMinterRole(address minterAddress) public onlyOwner {
         _minterAddress = minterAddress;
     }
 
-    /**
-     * @notice Set the marketplace contract so users need one step less.
-     */
+    /// @notice Set the marketplace address.
+    /// param marketplace The new marketplace address.
     function setMarketplace(address marketplace) public onlyOwner {
         _approvedMarketplace = marketplace;
     }
 
-    // - ONLYOPERATOR FUNCTIONS
-    // Functions to implement OpenSea's DefaultOperatorFilterer
+    /// ONLY OPERATOR FUNCTIONS ///
+    /// Functions to implement OpenSea's DefaultOperatorFilterer
+
     function setApprovalForAll(
         address operator,
         bool approved
@@ -217,7 +222,7 @@ contract TalentirTokenV0 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
         super.safeBatchTransferFrom(from, to, ids, amounts, data);
     }
 
-    // - INTERNAL FUNCTIONS
+    /// INTERNAL FUNCTIONS ///
     function _setTalent(uint256 tokenID, address talent) internal {
         address from = _talents[tokenID];
         _talents[tokenID] = talent;
