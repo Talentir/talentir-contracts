@@ -14,7 +14,6 @@ import {DefaultOperatorFilterer} from "operator-filter-registry/src/DefaultOpera
 contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFilterer, Ownable, Pausable {
     /// MEMBERS ///
     mapping(uint256 => string) private _tokenCIDs; // storing the IPFS CIDs
-    address private _approvedMarketplace;
     address private _minterAddress;
     uint256 public constant TOKEN_FRACTIONS = 1_000_000;
     mapping(uint256 => bool) public isOnPresale;
@@ -22,7 +21,6 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     mapping(address => mapping(uint256 => bool)) internal hasTokenPresaleAllowance;
 
     /// EVENTS ///
-    event MarketplaceApproved(address marketplaceAddress, bool approved);
     event RoyaltyPercentageChanged(uint256 percent);
     event TalentChanged(address from, address to, uint256 tokenID);
     event GlobalPresaleAllowanceSet(address user, bool allowance);
@@ -102,9 +100,6 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
         _setTalent(tokenId, talent);
         _mint(to, tokenId, TOKEN_FRACTIONS, "");
 
-        // Pre-approve marketplace contract (can be revoked by talent)
-        _setApprovalForAll(to, _approvedMarketplace, true);
-
         // Pre-approve minter role, so first sell order can automatically be executed at the end
         // of the countdown (can be revoked by talent)
         _setApprovalForAll(to, _minterAddress, true);
@@ -166,12 +161,6 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     /// @param minterAddress The new minter address.
     function setMinterRole(address minterAddress) public onlyOwner {
         _minterAddress = minterAddress;
-    }
-
-    /// @notice Set the marketplace address.
-    /// param marketplace The new marketplace address.
-    function setMarketplace(address marketplace) public onlyOwner {
-        _approvedMarketplace = marketplace;
     }
 
     /// ONLY OPERATOR FUNCTIONS ///
