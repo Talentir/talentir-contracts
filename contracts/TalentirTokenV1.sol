@@ -14,6 +14,7 @@ import {DefaultOperatorFilterer} from "operator-filter-registry/src/DefaultOpera
 contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFilterer, Ownable, Pausable {
     /// MEMBERS ///
     mapping(uint256 => string) private _tokenCIDs; // storing the IPFS CIDs
+    mapping(string => bool) internal _cids;
     address private _approvedMarketplace;
     address private _minterAddress;
     uint256 public constant TOKEN_FRACTIONS = 1_000_000;
@@ -95,9 +96,11 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
         address talent,
         bool mintWithPresale
     ) public onlyMinter whenNotPaused {
+        require(_cids[cid] == false, "Token CID already used");
         uint256 tokenId = contentIdToTokenId(contentID);
         require(bytes(_tokenCIDs[tokenId]).length == 0, "Token already minted");
         isOnPresale[tokenId] = mintWithPresale;
+        _cids[cid] = true;
         _tokenCIDs[tokenId] = cid;
         _setTalent(tokenId, talent);
         _mint(to, tokenId, TOKEN_FRACTIONS, "");
