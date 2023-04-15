@@ -164,13 +164,23 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
 
     /// @notice Set the minter address.
     /// @param minterAddress The new minter address.
-    function setMinterRole(address minterAddress) public onlyOwner {
+    /// @param approvedUsers Users who have the old minter address approved. Approval will be removed.
+    function setMinterRole(address minterAddress, address[] memory approvedUsers) public onlyOwner {
+        for (uint i = 0; i < approvedUsers.length; i++) {
+            _setApprovalForAll(approvedUsers[i], _minterAddress, false);
+        }
+
         _minterAddress = minterAddress;
     }
 
     /// @notice Set the marketplace address.
-    /// param marketplace The new marketplace address.
-    function setMarketplace(address marketplace) public onlyOwner {
+    /// @param marketplace The new marketplace address.
+    /// @param approvedUsers Users who have the old marketplace approved. Approval will be removed.
+    function setMarketplace(address marketplace, address[] memory approvedUsers) public onlyOwner {
+        for (uint i = 0; i < approvedUsers.length; i++) {
+            _setApprovalForAll(approvedUsers[i], _approvedMarketplace, false);
+        }
+
         _approvedMarketplace = marketplace;
     }
 
