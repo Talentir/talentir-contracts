@@ -92,7 +92,15 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         uint256 remainingQuantity
     );
 
-    event OrderCancelled(uint256 orderId, address indexed from);
+    event OrderCancelled(
+        uint256 orderId, 
+        address indexed from, 
+        uint256 tokenId, 
+        Side side, 
+        uint256 price, 
+        uint256 quantity
+    );
+
     event TalentirFeeSet(uint256 fee, address wallet);
 
     /// CONSTRUCTOR ///
@@ -176,18 +184,19 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         bool success;
         for (uint256 i = 0; i < orderIds.length; i++) {
             uint256 orderId = orderIds[i];
-            require(msg.sender == orders[orderId].sender, "Wrong user");
-            Side side = orders[orderId].side;
-            uint256 price = orders[orderId].price;
-            uint256 quantity = orders[orderId].quantity;
-            uint256 tokenId = orders[orderId].tokenId;
+            Order memory order = orders[orderId];
+            require(msg.sender == order.sender, "Wrong user");
+            Side side = order.side;
+            uint256 price = order.price;
+            uint256 quantity = order.quantity;
+            uint256 tokenId = order.tokenId;
             _removeOrder(orderId);
             if (side == Side.BUY) {
                 (success, ) = msg.sender.call{value: (price * quantity)}("");
             } else {
                 _safeTransferFrom(talentirNFT, tokenId, address(this), msg.sender, quantity);
             }
-            emit OrderCancelled(orderId, msg.sender);
+            emit OrderCancelled(orderId, order.sender, tokenId, side, price, quantity);
         }
     }
 
