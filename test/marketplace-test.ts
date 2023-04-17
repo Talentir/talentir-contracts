@@ -595,4 +595,39 @@ describe('Marketplace Tests', function () {
       marketplace.connect(sellAgent).makeSellOrder(seller.address, tokenId, oneEther, 1, true)
     ).to.be.revertedWith('Not allowed')
   })
+
+  it('order removed in the correct order', async function () {
+    // Mint token to seller
+    await talentirNFT.mint(
+      seller.address,
+      'abcd',
+      'abc',
+      royaltyReceiver.address,
+      false
+    )
+    const tokenId = await talentirNFT.contentIdToTokenId('abc')
+
+    // Order with ID 1 created
+    await expect(
+      marketplace
+        .connect(seller)
+        .makeSellOrder(seller.address, tokenId, oneEther, 1, true)
+    ).to.emit(marketplace, 'OrderAdded')
+      .withArgs(1, seller.address, tokenId, SELL, oneEther, 1)
+
+    // Order with ID 2 created
+    await expect(
+      marketplace
+        .connect(seller)
+        .makeSellOrder(seller.address, tokenId, oneEther, 1, true)
+    ).to.emit(marketplace, 'OrderAdded')
+      .withArgs(2, seller.address, tokenId, SELL, oneEther, 1)
+
+    // Order with ID 2 cancelled
+    await marketplace.connect(seller).cancelOrders([2])
+
+    // Correct order removed
+    const [orderId] = await marketplace.getBestOrder(tokenId, 1)
+    expect(orderId).to.equal(1)
+  })
 })

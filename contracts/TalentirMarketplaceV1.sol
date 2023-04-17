@@ -375,7 +375,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         // remove from userOrders linked list
         userOrders[orders[_orderId].sender].remove(_orderId);
         // remove order from linked list
-        markets[tokenId][side].orderList[price].pop(false);
+        markets[tokenId][side].orderList[price].remove(_orderId);
         // if this was the last remaining order, remove node from red-black tree
         if (!markets[tokenId][side].orderList[price].listExists()) {
             markets[tokenId][side].priceTree.remove(price);
