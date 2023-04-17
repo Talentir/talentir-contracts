@@ -97,6 +97,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
 
     /// CONSTRUCTOR ///
     constructor(address _talentirNFT) {
+        require(_talentirNFT != address(0), "Invalid address");
         require(IERC165(_talentirNFT).supportsInterface(type(IERC2981).interfaceId), "Must implement IERC2981");
         talentirNFT = _talentirNFT;
     }
@@ -209,6 +210,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     /// @param _fee fee percent (100% = 100,000)
     /// @param _wallet address where Talentir fee will be sent to
     function setTalentirFee(uint256 _fee, address _wallet) external onlyOwner {
+        require(_wallet != address(0), "Wallet is zero");
         require(_fee <= PERCENT / 10, "Must be <=10k"); // Talentir fee can never be higher than 10%
         talentirFeePercent = _fee;
         talentirFeeWallet = _wallet;
@@ -239,6 +241,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         }
         require(_ethQuantity > 0, "Price must be positive");
         require(_tokenQuantity > 0, "Token quantity must be positive");
+        require(_tokenQuantity <= 1_000_000, "Token quantity too high");
         uint256 price = _ethQuantity / _tokenQuantity;
         require(price > 0, "Rounding problem");
         uint256 bestPrice;
