@@ -207,7 +207,7 @@ describe('Marketplace Tests', function () {
       [marketplace, seller],
       [-1000, 1000]
     )
-    // // Order is removed
+    // Order is removed
     orderID = await marketplace.getBestOrder(tokenId, BUY)
     order = await marketplace.orders(orderID[0])
     expect(orderID[0]).to.equal(0)
