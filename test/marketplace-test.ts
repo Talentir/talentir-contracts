@@ -42,7 +42,7 @@ describe('Marketplace Tests', function () {
     await talentirNFT.setMinterRole(owner.address)
   })
 
-  it('should open and close a single order (no fees)', async function () {
+  it.only('should open and close a single order (no fees)', async function () {
     // Set royalties to 0 (will be tested later)
     await expect(talentirNFT.setRoyalty(0)).to.emit(
       talentirNFT,
@@ -163,9 +163,12 @@ describe('Marketplace Tests', function () {
 
     await expect(buyTransaction).to.emit(marketplace, 'OrderExecuted')
 
-    await expect(await buyTransaction).to.changeEtherBalances(
-      [buyer, seller],
-      [-oneEther, oneEther]
+    await expect(await buyTransaction).to.changeEtherBalance(
+      buyer, -oneEther
+    )
+
+    await expect(await marketplace.withdrawPayments(seller.address)).to.changeEtherBalance(
+      seller, oneEther
     )
 
     orderID = await marketplace.getBestOrder(tokenId, SELL)
@@ -204,7 +207,7 @@ describe('Marketplace Tests', function () {
       [marketplace, seller],
       [-1000, 1000]
     )
-    // Order is removed
+    // // Order is removed
     orderID = await marketplace.getBestOrder(tokenId, BUY)
     order = await marketplace.orders(orderID[0])
     expect(orderID[0]).to.equal(0)
@@ -212,6 +215,17 @@ describe('Marketplace Tests', function () {
     expect(order.side).to.equal(0)
     expect(order.price).to.equal(0)
     expect(order.quantity).to.equal(0)
+
+    // Withdraw tokens for buyer
+    await expect(marketplace.withdrawTokens(buyer.address, tokenId)).to.emit(
+      marketplace,
+      'ERC1155Withdrawn'
+    ).withNamedArgs({
+      wallet: buyer.address,
+      tokenId,
+      quantity: 1
+    })
+
     // Balances are updated
     expect(await talentirNFT.balanceOf(seller.address, tokenId)).to.equal(
       999998

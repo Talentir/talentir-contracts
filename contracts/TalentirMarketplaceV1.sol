@@ -6,6 +6,8 @@ import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {ERC1155Holder} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
+import {PullPayment} from "@openzeppelin/contracts/security/PullPayment.sol";
+import {ERC1155PullPayment} from "./utils/ERC1155PullPayment.sol";
 
 /// LIBRARIES ///
 import {RBTLibrary} from "./utils/RBTLibrary.sol";
@@ -20,7 +22,7 @@ import {IERC2981} from "@openzeppelin/contracts/interfaces/IERC2981.sol";
 /// @title Talentir Marketplace Contract
 /// @author Christoph Siebenbrunner, Johannes Kares
 /// @custom:security-contact office@talentir.com
-contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Holder {
+contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Holder, PullPayment, ERC1155PullPayment {
     /// LIBRARIES ///
     using RBTLibrary for RBTLibrary.Tree;
     using LinkedListLibrary for LinkedListLibrary.LinkedList;
@@ -96,8 +98,9 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     event TalentirFeeSet(uint256 fee, address wallet);
 
     /// CONSTRUCTOR ///
-    constructor(address _talentirNFT) {
+    constructor(address _talentirNFT) ERC1155PullPayment(_talentirNFT) {
         require(IERC165(_talentirNFT).supportsInterface(type(IERC2981).interfaceId), "Must implement IERC2981");
+        require(IERC165(_talentirNFT).supportsInterface(type(IERC1155).interfaceId), "Must implement IERC1155");
         talentirNFT = _talentirNFT;
     }
 
@@ -173,7 +176,6 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     /// @dev emits OrdersCancelled event.
     /// @param orderIds array of order Ids
     function cancelOrders(uint256[] calldata orderIds) external nonReentrant {
-        bool success;
         for (uint256 i = 0; i < orderIds.length; i++) {
             uint256 orderId = orderIds[i];
             require(msg.sender == orders[orderId].sender, "Wrong user");
@@ -183,9 +185,9 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
             uint256 tokenId = orders[orderId].tokenId;
             _removeOrder(orderId);
             if (side == Side.BUY) {
-                (success, ) = msg.sender.call{value: (price * quantity)}("");
+                _ethTransfer(msg.sender, price * quantity);
             } else {
-                _safeTransferFrom(talentirNFT, tokenId, address(this), msg.sender, quantity);
+                _tokenTransferFrom(tokenId, address(this), msg.sender, quantity);
             }
             emit OrderCancelled(orderId, msg.sender);
         }
@@ -275,8 +277,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         // Refund any remaining ETH from a buy order not added to order book
         if ((_side == Side.BUY) && !(_addOrderForRemaining)) {
             require(msg.value >= _ethQuantity, "Couldn't refund"); // just to be safe - don't refund more than what was sent
-            bool success;
-            (success, ) = _sender.call{value: _ethQuantity}("");
+            _ethTransfer(_sender, _ethQuantity);
         }
     }
 
@@ -305,24 +306,39 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
             orders[_orderId].quantity -= _quantity;
         }
 
+        locals.payToSeller = (order.price * _quantity) - locals.royalties - locals.talentirFee;
+
         if (order.side == Side.BUY) {
             // Caller is the seller
             locals.seller = _sender;
             locals.buyer = order.sender;
             locals.tokenSender = _sender;
+
+            // Safe to directly send the funds to seller since they are the caller.
+            // If they block the call they're just not getting a transaction through.
+            _ethTransfer(locals.seller, locals.payToSeller);
+
+            // Not safe to directly send the tokens to the buyer.
+            // They buyer is queried from the order book and might block the transaction.
+            _asyncTokenTransferFrom(order.tokenId, locals.tokenSender, locals.buyer, _quantity);
+
         } else {
             // Caller is the buyer
             locals.seller = order.sender;
             locals.buyer = _sender;
             locals.tokenSender = address(this);
+
+            // Not safe to directly send funds to the seller.
+            // The seller is queried from the order book and might block the transaction.
+            _asyncTransfer(locals.seller, locals.payToSeller);
+
+            // Safe to directly send the tokens to the buyer since they are the caller.
+            // If they block the call they're just not getting a transaction through.
+            _tokenTransferFrom(order.tokenId, locals.tokenSender, locals.buyer, _quantity);
         }
 
-        locals.payToSeller = (order.price * _quantity) - locals.royalties - locals.talentirFee;
-
-        _safeTransferFrom(talentirNFT, order.tokenId, locals.tokenSender, locals.buyer, _quantity);
-        (locals.success, ) = locals.seller.call{value: locals.payToSeller}("");
-        (locals.success, ) = locals.royaltiesReceiver.call{value: locals.royalties}("");
-        (locals.success, ) = talentirFeeWallet.call{value: locals.talentirFee}("");
+        _asyncTransfer(locals.royaltiesReceiver, locals.royalties);
+        _asyncTransfer(talentirFeeWallet, locals.talentirFee);
 
         emit OrderExecuted(
             _orderId, // orderId
@@ -343,7 +359,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     function _addOrder(uint256 _tokenId, Side _side, address _sender, uint256 _price, uint256 _quantity) internal {
         // Transfer tokens to this contract
         if (_side == Side.SELL) {
-            _safeTransferFrom(talentirNFT, _tokenId, _sender, address(this), _quantity);
+            _tokenTransferFrom(_tokenId, _sender, address(this), _quantity);
         }
         // Check if orders already exist at that price, otherwise add tree entry
         if (!markets[_tokenId][_side].priceTree.exists(_price)) {
@@ -385,14 +401,18 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     }
 
     /// @dev Calls safeTransferFrom (ERC1155)
-    function _safeTransferFrom(
-        address _token,
+    function _tokenTransferFrom(
         uint256 _tokenId,
         address _from,
         address _to,
         uint256 _quantity
     ) internal {
         bytes memory data;
-        IERC1155(_token).safeTransferFrom(_from, _to, _tokenId, _quantity, data);
+        IERC1155(talentirNFT).safeTransferFrom(_from, _to, _tokenId, _quantity, data);
+    }
+
+    function _ethTransfer(address to, uint256 weiCount) private {
+        (bool success, ) = to.call{value: weiCount}("");
+        require(success, "Transfer failed.");
     }
 }
