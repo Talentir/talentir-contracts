@@ -7,7 +7,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {ERC1155Holder} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import {PullPayment} from "@openzeppelin/contracts/security/PullPayment.sol";
-import {ERC1155PullPayment} from "./utils/ERC1155PullPayment.sol";
+import {ERC1155PullTransfer} from "./utils/ERC1155PullTransfer.sol";
 
 /// LIBRARIES ///
 import {RBTLibrary} from "./utils/RBTLibrary.sol";
@@ -22,7 +22,7 @@ import {IERC2981} from "@openzeppelin/contracts/interfaces/IERC2981.sol";
 /// @title Talentir Marketplace Contract
 /// @author Christoph Siebenbrunner, Johannes Kares
 /// @custom:security-contact office@talentir.com
-contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Holder, PullPayment, ERC1155PullPayment {
+contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Holder, PullPayment, ERC1155PullTransfer {
     /// LIBRARIES ///
     using RBTLibrary for RBTLibrary.Tree;
     using LinkedListLibrary for LinkedListLibrary.LinkedList;
@@ -98,7 +98,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     event TalentirFeeSet(uint256 fee, address wallet);
 
     /// CONSTRUCTOR ///
-    constructor(address _talentirNFT) ERC1155PullPayment(_talentirNFT) {
+    constructor(address _talentirNFT) ERC1155PullTransfer(_talentirNFT) {
         require(IERC165(_talentirNFT).supportsInterface(type(IERC2981).interfaceId), "Must implement IERC2981");
         require(IERC165(_talentirNFT).supportsInterface(type(IERC1155).interfaceId), "Must implement IERC1155");
         talentirNFT = _talentirNFT;
