@@ -130,11 +130,10 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
 
     /// PUBLIC FUNCTIONS ///
 
-    /// @notice Sell `tokenQuantity` of token `tokenId` for min `ETHquantity` total price. (ERC1155)
-    /// @dev Sell `tokenQuantity` of token `tokenId` for min `ETHquantity` total price. (ERC1155)
+    /// @notice Sell `tokenQuantity` of token `tokenId` for min `ethQuantity` total price. (ERC1155)
+    /// @dev Sell `tokenQuantity` of token `tokenId` for min `ethQuantity` total price. (ERC1155)
     /// @dev Price limit (`ETHquantity`) must always be included to prevent frontrunning.
     /// @dev Sender address must be able to receive Ether, otherwise funds may be lost (ony relevant if sent from a smart contract)
-    /// @dev Does NOT work for ERC20!.
     /// @dev can emit multiple OrderExecuted events.
     /// @param _for recipient who will receive the token (msg.sender must be approved to send token on behalf of _for)
     /// @param tokenId token Id (ERC1155)
@@ -154,8 +153,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     /// @notice Buy `tokenQuantity` of token `tokenId` for max `msg.value` total price.
     /// @dev Buy `tokenQuantity` of token `tokenId` for max `msg.value` total price.
     /// @dev Price limit must always be included to prevent frontrunning.
-    /// @dev Sender address must be able to receive Ether, otherwise funds may be lost (ony relevant if sent from a smart contract)
-    /// @dev Does NOT work for ERC20!.
+    /// @dev Sender address must be able to receive ERC1155 tokens, otherwise funds may be lost (ony relevant if sent from a smart contract)
     /// @dev can emit multiple OrderExecuted events.
     /// @param _for recipient who will receive the token (can be different from msg.sender)
     /// @param tokenId token Id (ERC1155)

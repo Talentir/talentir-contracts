@@ -42,7 +42,7 @@ describe('Marketplace Tests', function () {
     await talentirNFT.setMinterRole(owner.address)
   })
 
-  it.only('should open and close a single order (no fees)', async function () {
+  it('should open and close a single order (no fees)', async function () {
     // Set royalties to 0 (will be tested later)
     await expect(talentirNFT.setRoyalty(0)).to.emit(
       talentirNFT,
@@ -216,6 +216,11 @@ describe('Marketplace Tests', function () {
     expect(order.price).to.equal(0)
     expect(order.quantity).to.equal(0)
 
+    // Try withdrawing tokens for seller, nothing there
+    await expect(marketplace.withdrawTokens(seller.address, tokenId)).to.be.revertedWith(
+      'No tokens to withdraw'
+    )
+
     // Withdraw tokens for buyer
     await expect(marketplace.withdrawTokens(buyer.address, tokenId)).to.emit(
       marketplace,
@@ -292,10 +297,17 @@ describe('Marketplace Tests', function () {
 
     await expect(transaction).to.emit(marketplace, 'OrderExecuted')
 
-    await expect(await transaction).to.changeEtherBalances(
-      [buyer, seller, talentirFeeReceiver, royaltyReceiver],
-      [-1000, 850, 100, 50]
-    )
+    // Buyer pays
+    await expect(await transaction).to.changeEtherBalance(buyer, -1000)
+
+    // Seller is paid after withdrawal
+    await expect(await marketplace.withdrawPayments(seller.address)).to.changeEtherBalance(seller, 850)
+
+    // Fees are paid after withdrawal
+    await expect(await marketplace.withdrawPayments(talentirFeeReceiver.address)).to.changeEtherBalance(talentirFeeReceiver, 100)
+
+    // Royalties are paid after withdrawal
+    await expect(await marketplace.withdrawPayments(royaltyReceiver.address)).to.changeEtherBalance(royaltyReceiver, 50)
   })
 
   it('should handle multiple orders', async function () {
@@ -405,10 +417,13 @@ describe('Marketplace Tests', function () {
 
     await expect(transaction).to.emit(marketplace, 'OrderExecuted')
 
-    await expect(await transaction).to.changeEtherBalances(
-      [buyer, seller],
-      [-oneEther.mul(15), oneEther.mul(15)]
+    await expect(await transaction).to.changeEtherBalance(
+      buyer,
+      -oneEther.mul(15)
     )
+
+    // Seller gets paid after withdrawal
+    await expect(await marketplace.withdrawPayments(seller.address)).to.changeEtherBalance(seller, oneEther.mul(15))
 
     bestOrderId = await marketplace.getBestOrder(tokenId, SELL)
     bestOrder = await marketplace.orders(bestOrderId[0])
@@ -439,14 +454,17 @@ describe('Marketplace Tests', function () {
 
     await expect(transaction).to.emit(marketplace, 'OrderExecuted')
 
-    await expect(await transaction).to.changeEtherBalances(
-      [buyer, seller],
-      [-oneEther.mul(31), oneEther.mul(31)] // 15+16=31
+    await expect(await transaction).to.changeEtherBalance(
+      buyer,
+      -oneEther.mul(31) // 15+16=31
     )
+
+    // Seller gets paid after withdrawal
+    await expect(await marketplace.withdrawPayments(seller.address)).to.changeEtherBalance(seller, oneEther.mul(31))
 
     bestOrderId = await marketplace.getBestOrder(tokenId, SELL)
     bestOrder = await marketplace.orders(bestOrderId[0])
-    expect(await bestOrder.quantity).to.equal(1)
+    expect(bestOrder.quantity).to.equal(1)
   })
 
   it('should pause and cancel', async function () {
