@@ -57,6 +57,10 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         address royaltiesReceiver;
         bool success;
         uint256 talentirFee;
+        uint256 remainingQuantity;
+        uint256 quantity;
+        bool useAsyncTransfer;
+        uint256 cost;
     }
 
     /// MEMBERS ///
@@ -312,22 +316,26 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     ) internal returns (uint256 ethQuantity) {
         // This is an optimization to avoid the famous "stack to deep" error.
         OrderExecutedLocals memory locals;
-
         Order memory order = orders[_orderId];
+
+        locals.quantity = _quantity;
+        locals.useAsyncTransfer = _useAsyncTransfer;
+        locals.cost = order.price * _quantity;
 
         (locals.royaltiesReceiver, locals.royalties) = IERC2981(talentirNFT).royaltyInfo(
             order.tokenId,
-            (order.price * _quantity)
+            locals.cost
         );
 
-        locals.talentirFee = calcTalentirFee((order.price * _quantity));
+        locals.talentirFee = calcTalentirFee(locals.cost);
         
-        require(order.price * _quantity > (locals.royalties + locals.talentirFee), "Problem calculating fees");
+        require(locals.cost > (locals.royalties + locals.talentirFee), "Problem calculating fees");
 
         if (_quantity == order.quantity) {
             _removeOrder(_orderId);
         } else {
             orders[_orderId].quantity -= _quantity;
+            locals.remainingQuantity = orders[_orderId].quantity;
         }
         
         if (order.side == Side.BUY) {
@@ -342,7 +350,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
             locals.tokenSender = address(this);
         }
 
-        locals.payToSeller = (order.price * _quantity) - locals.royalties - locals.talentirFee;
+        locals.payToSeller = locals.cost - locals.royalties - locals.talentirFee;
 
         if (_useAsyncTransfer) {
             _asyncTokenTransferFrom(order.tokenId, locals.tokenSender, locals.buyer, _quantity);
@@ -356,31 +364,24 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
             _ethTransfer(talentirFeeWallet, locals.talentirFee);
         }
         
-        _emitOrderExecutedEvent(locals, _orderId, order.price, _quantity, orders[_orderId].quantity, _useAsyncTransfer);
+        _emitOrderExecutedEvent(locals, order);
 
-        return order.price * _quantity;
+        return locals.cost;
     }
 
     /// @dev This function exists to use less local variables and avoid the "stack to deep" error.
-    function _emitOrderExecutedEvent(
-        OrderExecutedLocals memory locals, 
-        uint256 orderId, 
-        uint256 price,
-        uint256 quantity, 
-        uint256 remainingQunatity,
-        bool asyncTransferUsed
-    ) internal {
+    function _emitOrderExecutedEvent(OrderExecutedLocals memory locals, Order memory order) internal {
         emit OrderExecuted(
-            orderId, // orderId
-            locals.buyer, // buyer
-            locals.seller, // seller
-            locals.payToSeller, // paidToSeller
-            price, // price
-            locals.royalties, // royalties
-            locals.royaltiesReceiver, // royaltiesReceiver
-            quantity, // quantity
-            remainingQunatity, // remainingQuantity
-            asyncTransferUsed
+            order.orderId,
+            locals.buyer,
+            locals.seller,
+            locals.payToSeller,
+            order.price,
+            locals.royalties,
+            locals.royaltiesReceiver,
+            locals.quantity,
+            locals.remainingQuantity,
+            locals.useAsyncTransfer
         );
     }
 
