@@ -79,7 +79,8 @@ contract TalentirMarketplaceV1 is
     uint256 public talentirFeePercent;
     address public talentirFeeWallet;
     uint256 public nextOrderId = 1;
-    uint256 internal constant PERCENT = 100_000;
+    uint256 public constant PERCENT = 100_000;
+    uint256 public constant PRICE_FACTOR = 1_000_000;
     bool private _contractCanReceiveToken = false;
 
     /// EVENTS ///
@@ -217,13 +218,13 @@ contract TalentirMarketplaceV1 is
 
             if (useAsyncTransfer) {
                 if (side == Side.BUY) {
-                    _asyncTransfer(order.sender, price * quantity);
+                    _asyncTransfer(order.sender, price * quantity / PRICE_FACTOR);
                 } else {
                     _asyncTokenTransferFrom(tokenId, address(this), order.sender, quantity);
                 }
             } else {
                 if (side == Side.BUY) {
-                    _ethTransfer(order.sender, price * quantity);
+                    _ethTransfer(order.sender, price * quantity / PRICE_FACTOR);
                 } else {
                     _tokenTransferFrom(tokenId, address(this), order.sender, quantity);
                 }
@@ -284,7 +285,7 @@ contract TalentirMarketplaceV1 is
         require(_ethQuantity > 0, "Price must be positive");
         require(_tokenQuantity > 0, "Token quantity must be positive");
         require(_tokenQuantity <= 1_000_000, "Token quantity too high");
-        uint256 price = _ethQuantity / _tokenQuantity;
+        uint256 price = _ethQuantity * PRICE_FACTOR / _tokenQuantity;
         require(price > 0, "Rounding problem");
         uint256 bestPrice;
         uint256 bestOrderId;
@@ -338,7 +339,7 @@ contract TalentirMarketplaceV1 is
 
         locals.quantity = _quantity;
         locals.useAsyncTransfer = _useAsyncTransfer;
-        locals.cost = order.price * _quantity;
+        locals.cost = order.price * _quantity / PRICE_FACTOR;
 
         (locals.royaltiesReceiver, locals.royalties) = IERC2981(talentirNFT).royaltyInfo(order.tokenId, locals.cost);
 
