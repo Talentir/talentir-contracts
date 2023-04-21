@@ -49,7 +49,10 @@ describe('TalentirNFT', function () {
     await expect(
       talentir.connect(luki).setMinterRole(minter.address, [])
     ).to.be.revertedWith('Ownable: caller is not the owner')
-    await talentir.setMinterRole(minter.address, [])
+
+    await expect(talentir.setMinterRole(luki.address, []))
+      .to.emit(talentir, 'MinterRoleChanged')
+      .withArgs(minter.address, luki.address)
   })
 
   it('mints', async function () {
@@ -72,7 +75,7 @@ describe('TalentirNFT', function () {
     ).to.be.revertedWith('Token already minted')
   })
 
-  it.only('can approve a marketplace & minter to transfer tokens', async function () {
+  it('can approve a marketplace & minter to transfer tokens', async function () {
     const contentID1 = '1'
     const tokenID1 = await talentir.contentIdToTokenId(contentID1)
 
@@ -82,7 +85,9 @@ describe('TalentirNFT', function () {
       talentir.connect(luki).setMarketplace(johnny.address, [])
     ).to.be.revertedWith('Ownable: caller is not the owner')
 
-    await talentir.setMarketplace(johnny.address, [])
+    await expect(talentir.setMarketplace(johnny.address, []))
+      .to.emit(talentir, 'MarketplaceChanged')
+      .withArgs(ethers.constants.AddressZero, johnny.address)
 
     await talentir
       .connect(minter)

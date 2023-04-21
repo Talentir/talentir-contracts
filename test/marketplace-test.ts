@@ -495,7 +495,14 @@ describe('Marketplace Tests', function () {
     // Can still cancel orders
     transaction = marketplace.connect(user).cancelOrders([1, 2])
 
-    await expect(transaction).to.emit(marketplace, 'OrderCancelled')
+    await expect(transaction).to.emit(marketplace, 'OrderCancelled').withNamedArgs({
+      orderId: 1,
+      from: user.address,
+      tokenId,
+      side: SELL,
+      price: oneEther,
+      quantity: 1
+    })
 
     await expect(await transaction).to.changeEtherBalances(
       [marketplace, user],

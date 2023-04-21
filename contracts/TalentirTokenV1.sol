@@ -25,6 +25,8 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     event MarketplaceApproved(address marketplaceAddress, bool approved);
     event RoyaltyPercentageChanged(uint256 percent);
     event TalentChanged(address from, address to, uint256 tokenID);
+    event MinterRoleChanged(address from, address to);
+    event MarketplaceChanged(address from, address to);
     event GlobalPresaleAllowanceSet(address user, bool allowance);
     event TokenPresaleAllowanceSet(address user, uint256 id, bool allowance);
     event PresaleEnded(uint256 tokenId);
@@ -103,6 +105,8 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
         _mint(to, tokenId, TOKEN_FRACTIONS, "");
 
         // Pre-approve marketplace contract (can be revoked by talent)
+        // This is necessary, so the market place can move the tokens on behalf of the user when posting
+        // the first sell order.
         _setApprovalForAll(to, _approvedMarketplace, true);
 
         // Pre-approve minter role, so first sell order can automatically be executed at the end
@@ -170,7 +174,9 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
             _setApprovalForAll(approvedUsers[i], _minterAddress, false);
         }
 
+        address from = _minterAddress;
         _minterAddress = minterAddress;
+        emit MinterRoleChanged(from, minterAddress);
     }
 
     /// @notice Set the marketplace address.
@@ -181,7 +187,9 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
             _setApprovalForAll(approvedUsers[i], _approvedMarketplace, false);
         }
 
+        address from = _approvedMarketplace;
         _approvedMarketplace = marketplace;
+        emit MarketplaceChanged(from, marketplace);
     }
 
     /// ONLY OPERATOR FUNCTIONS ///
