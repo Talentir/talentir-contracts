@@ -14,6 +14,7 @@ import {DefaultOperatorFilterer} from "operator-filter-registry/src/DefaultOpera
 contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFilterer, Ownable, Pausable {
     /// MEMBERS ///
     mapping(uint256 => string) private _tokenCIDs; // storing the IPFS CIDs
+    mapping(string => bool) internal _cids;
     address private _approvedMarketplace;
     address private _minterAddress;
     uint256 public constant TOKEN_FRACTIONS = 1_000_000;
@@ -25,6 +26,8 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     event MarketplaceApproved(address marketplaceAddress, bool approved);
     event RoyaltyPercentageChanged(uint256 percent);
     event TalentChanged(address from, address to, uint256 tokenID);
+    event MinterRoleChanged(address from, address to);
+    event MarketplaceChanged(address from, address to);
     event GlobalPresaleAllowanceSet(address user, bool allowance);
     event TokenPresaleAllowanceSet(address user, uint256 id, bool allowance);
     event PresaleEnded(uint256 tokenId);
@@ -97,15 +100,18 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     ) public onlyMinter whenNotPaused {
         require(bytes(cid).length > 0, "cid is empty");
         require(bytes(contentID).length > 0, "contentID is empty");
-
+        require(_cids[cid] == false, "Token CID already used");
         uint256 tokenId = contentIdToTokenId(contentID);
         require(bytes(_tokenCIDs[tokenId]).length == 0, "Token already minted");
         isOnPresale[tokenId] = mintWithPresale;
+        _cids[cid] = true;
         _tokenCIDs[tokenId] = cid;
         _setTalent(tokenId, talent);
         _mint(to, tokenId, TOKEN_FRACTIONS, "");
 
         // Pre-approve marketplace contract (can be revoked by talent)
+        // This is necessary, so the market place can move the tokens on behalf of the user when posting
+        // the first sell order.
         _setApprovalForAll(to, _approvedMarketplace, true);
 
         // Pre-approve minter role, so first sell order can automatically be executed at the end
@@ -172,14 +178,18 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     /// @param minterAddress The new minter address.
     function setMinterRole(address minterAddress) public onlyOwner {
         require(minterAddress != address(0), "Minter is zero");
+        address from = _minterAddress;
         _minterAddress = minterAddress;
+        emit MinterRoleChanged(from, minterAddress);
     }
 
     /// @notice Set the marketplace address.
     /// param marketplace The new marketplace address.
     function setMarketplace(address marketplace) public onlyOwner {
         require(marketplace != address(0), "Marketplace is zero");
+        address from = _approvedMarketplace;
         _approvedMarketplace = marketplace;
+        emit MarketplaceChanged(from, marketplace);
     }
 
     /// ONLY OPERATOR FUNCTIONS ///
