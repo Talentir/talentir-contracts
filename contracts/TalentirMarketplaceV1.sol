@@ -40,11 +40,19 @@ contract TalentirMarketplaceV1 is
         mapping(uint256 => LinkedListLibrary.LinkedList) orderList;
     }
 
+    /// @notice Side of order (buy=0, sell=1)
     enum Side {
         BUY,
         SELL
     }
 
+    /// @notice Order struct
+    /// @param orderId Id of order
+    /// @param tokenId Id of token (ERC1155)
+    /// @param side Side of order (buy=0, sell=1)
+    /// @param sender Address of sender
+    /// @param price Price of order. This is the price for 100% of the quantity.
+    /// @param quantity Remaining quantity of order
     struct Order {
         uint256 orderId;
         uint256 tokenId;
@@ -54,7 +62,7 @@ contract TalentirMarketplaceV1 is
         uint256 quantity;
     }
 
-    // This is used for a "stack to deep" error optimization
+    /// @dev This is used for a "stack to deep" error optimization
     struct OrderExecutedLocals {
         address seller;
         address buyer;
@@ -84,6 +92,13 @@ contract TalentirMarketplaceV1 is
     bool private _contractCanReceiveToken = false;
 
     /// EVENTS ///
+    /// @notice Event emitted when a new order is added
+    /// @param orderId Id of order
+    /// @param from Address of sender
+    /// @param tokenId Id of token (ERC1155)
+    /// @param side Side of order (buy=0, sell=1)
+    /// @param price Price of order. This is the price for 100% of the quantity.
+    /// @param quantity Quantity of order
     event OrderAdded(
         uint256 indexed orderId,
         address indexed from,
@@ -93,6 +108,17 @@ contract TalentirMarketplaceV1 is
         uint256 quantity
     );
 
+    /// @notice Event emitted when an order is executed
+    /// @param orderId Id of order
+    /// @param buyer Address of buyer
+    /// @param seller Address of seller
+    /// @param paidToSeller Amount of token paid to seller (in wei)
+    /// @param price Price of order. This is the price for 100% of the quantity.
+    /// @param royalties Amount of token paid to royalties receiver (in wei)
+    /// @param royaltiesReceiver Address of royalties receiver
+    /// @param quantity Executed quantity of order
+    /// @param remainingQuantity Remaining quantity in order
+    /// @param asyncTransfer If true, the transfer of the token / ETH was executed async
     event OrderExecuted(
         uint256 orderId,
         address indexed buyer,
@@ -106,6 +132,14 @@ contract TalentirMarketplaceV1 is
         bool asyncTransfer
     );
 
+    /// @notice Event emitted when an order is cancelled
+    /// @param orderId Id of order
+    /// @param from Address of sender
+    /// @param tokenId Id of token (ERC1155)
+    /// @param side Side of order (buy=0, sell=1)
+    /// @param price Price of order. This is the price for 100% of the quantity.
+    /// @param quantity Quantity of order that was cancelled
+    /// @param asyncTransfer If true, the refund of the token / ETH was executed async
     event OrderCancelled(
         uint256 indexed orderId,
         address indexed from,
@@ -116,6 +150,9 @@ contract TalentirMarketplaceV1 is
         bool asyncTransfer
     );
 
+    /// @notice Event emitted when the fee is changed
+    /// @param fee New fee (100% = 100 000)
+    /// @param wallet New wallet that receives the fee
     event TalentirFeeSet(uint256 fee, address wallet);
 
     /// CONSTRUCTOR ///
@@ -249,7 +286,7 @@ contract TalentirMarketplaceV1 is
     /// @dev Set the fee that Talentir will receive on each transaction.
     /// @dev emits DefaultFeeSet event.
     /// @dev fee capped at 10%
-    /// @param _fee fee percent (100% = 100,000)
+    /// @param _fee fee percent (100% = 100 000)
     /// @param _wallet address where Talentir fee will be sent to
     function setTalentirFee(uint256 _fee, address _wallet) external onlyOwner {
         require(_wallet != address(0), "Wallet is zero");
