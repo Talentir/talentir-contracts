@@ -25,6 +25,8 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     event MarketplaceApproved(address marketplaceAddress, bool approved);
     event RoyaltyPercentageChanged(uint256 percent);
     event TalentChanged(address from, address to, uint256 tokenID);
+    event MinterRoleChanged(address from, address to);
+    event MarketplaceChanged(address from, address to);
     event GlobalPresaleAllowanceSet(address user, bool allowance);
     event TokenPresaleAllowanceSet(address user, uint256 id, bool allowance);
     event PresaleEnded(uint256 tokenId);
@@ -165,13 +167,17 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     /// @notice Set the minter address.
     /// @param minterAddress The new minter address.
     function setMinterRole(address minterAddress) public onlyOwner {
+        address from = _minterAddress;
         _minterAddress = minterAddress;
+        emit MinterRoleChanged(from, minterAddress);
     }
 
     /// @notice Set the marketplace address.
     /// param marketplace The new marketplace address.
     function setMarketplace(address marketplace) public onlyOwner {
+        address from = _approvedMarketplace;
         _approvedMarketplace = marketplace;
+        emit MarketplaceChanged(from, marketplace);
     }
 
     /// ONLY OPERATOR FUNCTIONS ///
