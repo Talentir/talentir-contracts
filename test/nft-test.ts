@@ -57,6 +57,7 @@ describe('TalentirNFT', function () {
 
   it('mints', async function () {
     const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
+    const cid2 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU2'
     const contentID1 = '1'
     const tokenID1 = await talentir.contentIdToTokenId(contentID1)
     await expect(
@@ -71,8 +72,14 @@ describe('TalentirNFT', function () {
     await expect(
       talentir
         .connect(minter)
-        .mint(luki.address, cid1, contentID1, luki.address, false)
+        .mint(luki.address, cid2, contentID1, luki.address, false)
     ).to.be.revertedWith('Token already minted')
+
+    await expect(
+      talentir
+        .connect(minter)
+        .mint(luki.address, cid1, contentID1, luki.address, false)
+    ).to.be.revertedWith('Token CID already used')
   })
 
   it('can approve a marketplace to transfer tokens', async function () {
