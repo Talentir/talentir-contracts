@@ -21,10 +21,10 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     mapping(string => bool) public cids;
 
     /// @notice The address of the marketplace contract
-    address private approvedMarketplace;
+    address public approvedMarketplace;
 
     /// @notice The address of the minter
-    address private minterAddress;
+    address public minterAddress;
 
     /// @notice tokenID => isOnPresale (true/false)
     mapping(uint256 => bool) public isOnPresale;
@@ -48,32 +48,32 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     /// @param from The old talent address
     /// @param to The new talent address
     /// @param tokenID The token ID
-    event TalentChanged(address from, address to, uint256 tokenID);
+    event TalentChanged(address indexed from, address indexed to, uint256 indexed tokenID);
 
     /// @notice Emitted when the minter role has changed
     /// @param from The old minter address
     /// @param to The new minter address
-    event MinterRoleChanged(address from, address to);
+    event MinterRoleChanged(address indexed from, address indexed to);
 
     /// @notice Emitted when the marketplace address has changed
     /// @param from The old marketplace address
     /// @param to The new marketplace address
-    event MarketplaceChanged(address from, address to);
+    event MarketplaceChanged(address indexed from, address indexed to);
 
     /// @notice Emitted when the global presale allowance for a user is changed
     /// @param user The user address
     /// @param allowance The new allowance
-    event GlobalPresaleAllowanceSet(address user, bool allowance);
+    event GlobalPresaleAllowanceSet(address indexed user, bool allowance);
 
     /// @notice Emitted when the token presale allowance for a user is changed
     /// @param user The user address
     /// @param id The token ID
     /// @param allowance The new allowance
-    event TokenPresaleAllowanceSet(address user, uint256 id, bool allowance);
+    event TokenPresaleAllowanceSet(address indexed user, uint256 indexed id, bool allowance);
 
     /// @notice Emitted when the presale for a token has ended
     /// @param tokenId The token ID
-    event PresaleEnded(uint256 tokenId);
+    event PresaleEnded(uint256 indexed tokenId);
 
     /// PUBLIC FUNCTIONS ///
 
@@ -190,7 +190,7 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     /// @notice Set the royalty percentage for all tokens.
     /// @param percent The new royalty percentage. 1% = 1000.
     function setRoyalty(uint256 percent) external onlyOwner {
-        require(percent <= 10_000, "Must be <= 10%");
+        require(percent <= ONE_HUNDRED_PERCENT / 10, "Must be <= 10%");
         royaltyPercent = percent;
         emit RoyaltyPercentageChanged(percent);
     }
@@ -286,7 +286,7 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
 
     /// @dev Throws if called by any account other than the minter.
     modifier onlyMinter() {
-        require(_msgSender() == minterAddress, "Not allowed");
+        require(_msgSender() == minterAddress, "Not minter");
         _;
     }
 

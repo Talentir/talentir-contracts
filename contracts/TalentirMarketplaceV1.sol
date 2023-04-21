@@ -87,7 +87,7 @@ contract TalentirMarketplaceV1 is
     mapping(uint256 => Order) public orders;
 
     /// @notice Address of the corresponding ERC1155 contract
-    address public talentirNFT;
+    address public talentirToken;
 
     /// @notice Current Marketplace Fee. 100% = 100 000
     uint256 public talentirFeePercent;
@@ -96,7 +96,7 @@ contract TalentirMarketplaceV1 is
     address public talentirFeeWallet;
 
     /// @notice The constant represnting 100%
-    uint256 public constant PERCENT = 100_000;
+    uint256 public constant ONE_HUNDRED_PERCENT = 100_000;
 
     /// @notice This is the price factor. Public prices in this contract always represent 100% of
     /// the available quantity. This can be used to calculate the price for a single token.
@@ -173,14 +173,14 @@ contract TalentirMarketplaceV1 is
     /// @notice Event emitted when the fee is changed
     /// @param fee New fee (100% = 100 000)
     /// @param wallet New wallet that receives the fee
-    event TalentirFeeSet(uint256 fee, address wallet);
+    event TalentirFeeSet(uint256 fee, address indexed wallet);
 
     /// CONSTRUCTOR ///
-    constructor(address _talentirNFT) ERC1155PullTransfer(_talentirNFT) {
-        require(_talentirNFT != address(0), "Invalid address");
-        require(IERC165(_talentirNFT).supportsInterface(type(IERC2981).interfaceId), "Must implement IERC2981");
-        require(IERC165(_talentirNFT).supportsInterface(type(IERC1155).interfaceId), "Must implement IERC1155");
-        talentirNFT = _talentirNFT;
+    constructor(address _talentirToken) ERC1155PullTransfer(_talentirToken) {
+        require(_talentirToken != address(0), "Invalid address");
+        require(IERC165(_talentirToken).supportsInterface(type(IERC2981).interfaceId), "Must implement IERC2981");
+        require(IERC165(_talentirToken).supportsInterface(type(IERC1155).interfaceId), "Must implement IERC1155");
+        talentirToken = _talentirToken;
     }
 
     /// PUBLIC FUNCTIONS ///
@@ -195,8 +195,8 @@ contract TalentirMarketplaceV1 is
         price = _side == Side.BUY
             ? _markets[_tokenId][_side].priceTree.last()
             : _markets[_tokenId][_side].priceTree.first();
-        uint256 bestOrderId;
-        (, bestOrderId, ) = _markets[_tokenId][_side].orderList[price].getNode(0);
+
+        (, uint256 bestOrderId, ) = _markets[_tokenId][_side].orderList[price].getNode(0);
         orderId = bestOrderId;
     }
 
@@ -205,7 +205,7 @@ contract TalentirMarketplaceV1 is
     /// @param _totalPaid price*volume
     /// @return uint256 fee
     function calcTalentirFee(uint256 _totalPaid) public view returns (uint256) {
-        return (talentirFeePercent * _totalPaid) / PERCENT;
+        return (talentirFeePercent * _totalPaid) / ONE_HUNDRED_PERCENT;
     }
 
     /// @notice Sell `tokenQuantity` of token `tokenId` for min `ethQuantity` total price. (ERC1155)
@@ -263,10 +263,12 @@ contract TalentirMarketplaceV1 is
             uint256 orderId = orderIds[i];
             Order memory order = orders[orderId];
             require(msg.sender == order.sender || msg.sender == owner(), "Wrong user");
+
             Side side = order.side;
             uint256 price = order.price;
             uint256 quantity = order.quantity;
             uint256 tokenId = order.tokenId;
+
             _removeOrder(orderId);
 
             if (useAsyncTransfer) {
@@ -306,7 +308,7 @@ contract TalentirMarketplaceV1 is
     /// @param _wallet address where Talentir fee will be sent to
     function setTalentirFee(uint256 _fee, address _wallet) external onlyOwner {
         require(_wallet != address(0), "Wallet is zero");
-        require(_fee <= PERCENT / 10, "Must be <=10k"); // Talentir fee can never be higher than 10%
+        require(_fee <= ONE_HUNDRED_PERCENT / 10, "Must be <=10k"); // Talentir fee can never be higher than 10%
         talentirFeePercent = _fee;
         talentirFeeWallet = _wallet;
         emit TalentirFeeSet(_fee, _wallet);
@@ -331,22 +333,25 @@ contract TalentirMarketplaceV1 is
     ) internal {
         if (_side == Side.SELL) {
             require(
-                (_sender == msg.sender) || (IERC1155(talentirNFT).isApprovedForAll(_sender, msg.sender)),
+                (_sender == msg.sender) || (IERC1155(talentirToken).isApprovedForAll(_sender, msg.sender)),
                 "Not allowed"
             );
         }
+
         require(_ethQuantity > 0, "Price must be positive");
         require(_tokenQuantity > 0, "Token quantity must be positive");
         require(_tokenQuantity <= 1_000_000, "Token quantity too high");
+
         uint256 price = (_ethQuantity * PRICE_FACTOR) / _tokenQuantity;
         require(price > 0, "Rounding problem");
-        uint256 bestPrice;
-        uint256 bestOrderId;
+
         uint256 ethQuantityExecuted;
         Side oppositeSide = _oppositeSide(_side);
-        (bestOrderId, bestPrice) = getBestOrder(_tokenId, oppositeSide);
+        (uint256 bestOrderId, uint256 bestPrice) = getBestOrder(_tokenId, oppositeSide);
+
         // If possible, buy up to the specified price limit
         uint256 remainingQuantity = _tokenQuantity;
+
         while (
             (remainingQuantity > 0) &&
             ((_side == Side.BUY) ? price >= bestPrice : price <= bestPrice) &&
@@ -358,11 +363,14 @@ contract TalentirMarketplaceV1 is
             } else {
                 quantityToBuy = orders[bestOrderId].quantity;
             }
+
             ethQuantityExecuted = _executeOrder(_sender, bestOrderId, quantityToBuy, _useAsyncTransfer);
             remainingQuantity -= quantityToBuy;
+
             if ((_side == Side.BUY) && !(_addOrderForRemaining)) {
                 _ethQuantity -= ethQuantityExecuted;
             }
+
             if (remainingQuantity > 0) {
                 (bestOrderId, bestPrice) = getBestOrder(_tokenId, oppositeSide);
             }
@@ -371,9 +379,11 @@ contract TalentirMarketplaceV1 is
         if (_addOrderForRemaining && (remainingQuantity > 0)) {
             _addOrder(_tokenId, _side, _sender, price, remainingQuantity);
         }
+
         // Refund any remaining ETH from a buy order not added to order book
         if ((_side == Side.BUY) && !(_addOrderForRemaining)) {
             require(msg.value >= _ethQuantity, "Couldn't refund"); // just to be safe - don't refund more than what was sent
+
             // Safe to directly send ETH. In the worst case the transaction just doesn't go through.
             _ethTransfer(_sender, _ethQuantity);
         }
@@ -394,7 +404,7 @@ contract TalentirMarketplaceV1 is
         locals.useAsyncTransfer = _useAsyncTransfer;
         locals.cost = (order.price * _quantity) / PRICE_FACTOR;
 
-        (locals.royaltiesReceiver, locals.royalties) = IERC2981(talentirNFT).royaltyInfo(order.tokenId, locals.cost);
+        (locals.royaltiesReceiver, locals.royalties) = IERC2981(talentirToken).royaltyInfo(order.tokenId, locals.cost);
 
         locals.talentirFee = calcTalentirFee(locals.cost);
 
@@ -508,7 +518,7 @@ contract TalentirMarketplaceV1 is
     function _tokenTransferFrom(uint256 _tokenId, address _from, address _to, uint256 _quantity) internal {
         _contractCanReceiveToken = true;
         bytes memory data;
-        IERC1155(talentirNFT).safeTransferFrom(_from, _to, _tokenId, _quantity, data);
+        IERC1155(talentirToken).safeTransferFrom(_from, _to, _tokenId, _quantity, data);
         _contractCanReceiveToken = false;
     }
 

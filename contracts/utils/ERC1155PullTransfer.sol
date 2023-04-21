@@ -11,7 +11,7 @@ contract ERC1155PullTransfer {
     mapping(address => mapping(uint256 => uint256)) public userTokenEscrow;
 
     /// @notice Token contract address
-    address private _tokenContract;
+    IERC1155 private _tokenContract;
 
     /// @notice This event is emitted when tokens are deposited into the escrow
     /// @param wallet The address of the user
@@ -28,7 +28,7 @@ contract ERC1155PullTransfer {
     /// @notice Constructor
     /// @param tokenContract The address of the ERC1155 token contract
     constructor(address tokenContract) {
-        _tokenContract = tokenContract;
+        _tokenContract = IERC1155(tokenContract);
     }
 
     /// @notice Function to withdraw tokens from this contract. Notice that ANY user can call this function
@@ -43,7 +43,7 @@ contract ERC1155PullTransfer {
 
         // Transfer token to user
         bytes memory data;
-        IERC1155(_tokenContract).safeTransferFrom(address(this), _user, _tokenId, balance, data);
+        _tokenContract.safeTransferFrom(address(this), _user, _tokenId, balance, data);
 
         emit ERC1155Withdrawn(_user, _tokenId, balance);
     }
@@ -56,7 +56,7 @@ contract ERC1155PullTransfer {
     function _asyncTokenTransferFrom(uint256 _tokenId, address _from, address _to, uint256 _quantity) internal virtual {
         // First, transfer token into this contract
         bytes memory data;
-        IERC1155(_tokenContract).safeTransferFrom(_from, address(this), _tokenId, _quantity, data);
+        _tokenContract.safeTransferFrom(_from, address(this), _tokenId, _quantity, data);
 
         // Make them available for withdrawal
         userTokenEscrow[_to][_tokenId] += _quantity;

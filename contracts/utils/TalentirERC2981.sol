@@ -16,7 +16,7 @@ contract TalentirERC2981 is ERC165, IERC2981 {
     uint256 public royaltyPercent = 7_500;
 
     /// @notice The constant for 100%
-    uint256 public constant PERCENT = 100_000;
+    uint256 public constant ONE_HUNDRED_PERCENT = 100_000;
 
     /// @notice Interface for the NFT Royalty Standard.
     /// @param tokenId The token ID to query
@@ -26,10 +26,10 @@ contract TalentirERC2981 is ERC165, IERC2981 {
     function royaltyInfo(
         uint256 tokenId,
         uint256 value
-    ) public view override returns (address receiver, uint256 royaltyAmount) {
+    ) external view override returns (address receiver, uint256 royaltyAmount) {
         require(talents[tokenId] != address(0), "No royalty info for address");
         receiver = talents[tokenId];
-        royaltyAmount = (value * royaltyPercent) / PERCENT;
+        royaltyAmount = (value * royaltyPercent) / ONE_HUNDRED_PERCENT;
     }
 
     /// @dev Supporting the ERC2981 interface
