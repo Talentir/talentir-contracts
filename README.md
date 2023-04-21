@@ -14,7 +14,7 @@ The Talentir Token Contract adheres to the following standards:
 ### Features
 
 - The Token ID is its `keccak256` hash of the unique `content ID` provided during minting.
-- Minting is allowed for a single address, which is settable by the `Owner`. This address is pre-approved to transfer freshly minted tokens on behalf of the initial owner so the minter role can post an initial sale on behalf of the owner.
+- Minting is allowed for a single address, which is settable by the contract `Owner`. This address is pre-approved to transfer freshly minted tokens on behalf of the initial token owner so the minter role can post an initial sale on behalf of the owner.
 - The `Owner` can be set to a null address to kill all admin functionality.
 - A Token is minted as 1 million fungible parts, and this property cannot be changed.
 - The Token Contract contains the address of an approved marketplace that can be changed by the `Owner`. This address is pre-approved to transfer freshly minted tokens on behalf of the initial owner, so the owner can directly post their first sale.
