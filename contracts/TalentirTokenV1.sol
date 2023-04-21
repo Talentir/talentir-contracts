@@ -194,7 +194,7 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     /// @param approvedUsers Users who have the old marketplace approved. Approval will be removed.
     function setMarketplace(address marketplace, address[] memory approvedUsers) public onlyOwner {
         require(marketplace != address(0), "Marketplace is zero");
-        
+
         for (uint i = 0; i < approvedUsers.length; i++) {
             _setApprovalForAll(approvedUsers[i], _approvedMarketplace, false);
         }

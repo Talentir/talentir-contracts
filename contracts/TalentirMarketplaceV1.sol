@@ -7,11 +7,11 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {PullPayment} from "@openzeppelin/contracts/security/PullPayment.sol";
 import {ERC1155Receiver} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Receiver.sol";
+import {ERC1155PullTransfer} from "./utils/ERC1155PullTransfer.sol";
 
 /// LIBRARIES ///
-import {RBTLibrary} from "./utils/RBTLibrary.sol";
-import {LinkedListLibrary} from "./utils/LinkedListLibrary.sol";
-import {ERC1155PullTransfer} from "./utils/ERC1155PullTransfer.sol";
+import {RBTLibrary} from "./libraries/RBTLibrary.sol";
+import {LinkedListLibrary} from "./libraries/LinkedListLibrary.sol";
 
 /// INTERFACES ///
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -22,7 +22,14 @@ import {IERC2981} from "@openzeppelin/contracts/interfaces/IERC2981.sol";
 /// @title Talentir Marketplace Contract
 /// @author Christoph Siebenbrunner, Johannes Kares
 /// @custom:security-contact office@talentir.com
-contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Receiver, PullPayment, ERC1155PullTransfer {
+contract TalentirMarketplaceV1 is
+    Pausable,
+    Ownable,
+    ReentrancyGuard,
+    ERC1155Receiver,
+    PullPayment,
+    ERC1155PullTransfer
+{
     /// LIBRARIES ///
     using RBTLibrary for RBTLibrary.Tree;
     using LinkedListLibrary for LinkedListLibrary.LinkedList;
@@ -99,11 +106,11 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Rec
     );
 
     event OrderCancelled(
-        uint256 indexed orderId, 
-        address indexed from, 
-        uint256 indexed tokenId, 
-        Side side, 
-        uint256 price, 
+        uint256 indexed orderId,
+        address indexed from,
+        uint256 indexed tokenId,
+        Side side,
+        uint256 price,
         uint256 quantity,
         bool asyncTransfer
     );
@@ -139,7 +146,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Rec
     ///   @param _totalPaid price*volume
     ///   @return uint256 fee
     function calcTalentirFee(uint256 _totalPaid) public view returns (uint256) {
-        return talentirFeePercent * _totalPaid / PERCENT;
+        return (talentirFeePercent * _totalPaid) / PERCENT;
     }
 
     /// PUBLIC FUNCTIONS ///
@@ -313,7 +320,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Rec
         // Refund any remaining ETH from a buy order not added to order book
         if ((_side == Side.BUY) && !(_addOrderForRemaining)) {
             require(msg.value >= _ethQuantity, "Couldn't refund"); // just to be safe - don't refund more than what was sent
-            // Safe to directly send ETH. Worst case transaction doesn't go through.
+            // Safe to directly send ETH. In the worst case the transaction just doesn't go through.
             _ethTransfer(_sender, _ethQuantity);
         }
     }
@@ -333,13 +340,10 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Rec
         locals.useAsyncTransfer = _useAsyncTransfer;
         locals.cost = order.price * _quantity;
 
-        (locals.royaltiesReceiver, locals.royalties) = IERC2981(talentirNFT).royaltyInfo(
-            order.tokenId,
-            locals.cost
-        );
+        (locals.royaltiesReceiver, locals.royalties) = IERC2981(talentirNFT).royaltyInfo(order.tokenId, locals.cost);
 
         locals.talentirFee = calcTalentirFee(locals.cost);
-        
+
         require(locals.cost > (locals.royalties + locals.talentirFee), "Problem calculating fees");
 
         if (_quantity == order.quantity) {
@@ -348,7 +352,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Rec
             orders[_orderId].quantity -= _quantity;
             locals.remainingQuantity = orders[_orderId].quantity;
         }
-        
+
         if (order.side == Side.BUY) {
             // Caller is the seller
             locals.seller = _sender;
@@ -374,7 +378,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Rec
             _ethTransfer(locals.royaltiesReceiver, locals.royalties);
             _ethTransfer(talentirFeeWallet, locals.talentirFee);
         }
-        
+
         _emitOrderExecutedEvent(locals, order);
 
         return locals.cost;
@@ -441,12 +445,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Rec
     }
 
     /// @dev Calls safeTransferFrom (ERC1155)
-    function _tokenTransferFrom(
-        uint256 _tokenId,
-        address _from,
-        address _to,
-        uint256 _quantity
-    ) internal {
+    function _tokenTransferFrom(uint256 _tokenId, address _from, address _to, uint256 _quantity) internal {
         _contractCanReceiveToken = true;
         bytes memory data;
         IERC1155(talentirNFT).safeTransferFrom(_from, _to, _tokenId, _quantity, data);
@@ -478,8 +477,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Rec
         uint256,
         bytes calldata
     ) public virtual override returns (bytes4) {
-        require(msg.sender == talentirNFT, "Only Talentir Tokens");
-        require(_contractCanReceiveToken, "Only in sell order");
+        require(_contractCanReceiveToken, "Cannot receive");
 
         return this.onERC1155Received.selector;
     }
@@ -491,9 +489,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Rec
         uint256[] calldata,
         bytes calldata
     ) public virtual override returns (bytes4) {
-        require(msg.sender == talentirNFT, "Only Talentir Tokens");
-        require(_contractCanReceiveToken, "Only in sell order");
-
-        return this.onERC1155BatchReceived.selector;
+        // This contract can't receive batch transfers
+        return 0;
     }
 }

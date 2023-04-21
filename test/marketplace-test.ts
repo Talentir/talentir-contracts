@@ -47,11 +47,40 @@ describe('Marketplace Tests', function () {
       'TalentirMarketplaceV1'
     )
 
-    // Can't deploy if it's not a IERC2981 contract
+    // Can't deploy if it's not a IERC2981 or ERC1155 contract
     await expect(MarketplaceFactory.deploy(owner.address)).to.be.reverted
 
     await expect(MarketplaceFactory.deploy(ethers.constants.AddressZero))
       .to.be.revertedWith('Invalid address')
+
+    // Mint test token
+    await talentirNFT.mint(
+      seller.address,
+      'abc',
+      'abc',
+      royaltyReceiver.address,
+      false
+    )
+
+    const tokenId = await talentirNFT.contentIdToTokenId('abc')
+
+    // Contract can't receive batch transfers.
+    await expect(talentirNFT.safeBatchTransferFrom(
+      seller.address,
+      marketplace.address,
+      [tokenId],
+      [1],
+      '0x00'
+    )).to.be.revertedWith('ERC1155: ERC1155Receiver rejected tokens')
+
+    // Contract can't receive regular transfers
+    await expect(talentirNFT.safeTransferFrom(
+      seller.address,
+      marketplace.address,
+      tokenId,
+      1,
+      '0x00'
+    )).to.be.revertedWith('Cannot receive')
   })
 
   it('should open and close a single order (no fees)', async function () {
@@ -712,6 +741,11 @@ describe('Marketplace Tests', function () {
       // Buyer can withdraw correct amount
       await marketplace.withdrawTokens(buyer.address, tokenId)
       expect(await talentirNFT.balanceOf(buyer.address, tokenId)).to.equal(quantity)
+
+      // Withdrawing again doesn't work
+      await expect(marketplace.withdrawTokens(buyer.address, tokenId)).to.be.revertedWith(
+        'No tokens to withdraw'
+      )
     }
 
     // Execute partial Buy Order. Buyer is caller.
