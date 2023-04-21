@@ -7,7 +7,7 @@ import { ethers } from 'hardhat'
 import { TalentirTokenV1 } from "../typechain-types";
 
 // Reference : https://ethereum-waffle.readthedocs.io/en/latest/matchers.html
-describe('TalentirNFT', function () {
+describe('Talentir Token Tests', function () {
   let admin: SignerWithAddress
   let minter: SignerWithAddress
   let luki: SignerWithAddress

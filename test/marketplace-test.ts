@@ -4,7 +4,7 @@ import { ethers } from 'hardhat'
 // eslint-disable-next-line
 import { TalentirTokenV1, TalentirMarketplaceV1 } from "../typechain-types";
 
-describe('Marketplace Tests', function () {
+describe('Talentir Marketplace Tests', function () {
   let talentirNFT: TalentirTokenV1
   let marketplace: TalentirMarketplaceV1
   let owner: SignerWithAddress
