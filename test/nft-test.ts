@@ -237,7 +237,7 @@ describe('Talentir Token Tests', function () {
       .to.emit(talentir, 'TalentChanged')
       .withArgs(johnny.address, luki.address, tokenID1)
 
-    const talent = await talentir.getTalent(tokenID1)
+    const talent = await talentir.talents(tokenID1)
     expect(talent).to.equal(luki.address)
   })
 

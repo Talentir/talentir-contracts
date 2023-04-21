@@ -35,10 +35,6 @@ contract TalentirMarketplaceV1 is
     using LinkedListLibrary for LinkedListLibrary.LinkedList;
 
     /// TYPES ///
-    struct OrderBook {
-        RBTLibrary.Tree priceTree;
-        mapping(uint256 => LinkedListLibrary.LinkedList) orderList;
-    }
 
     /// @notice Side of order (buy=0, sell=1)
     enum Side {
@@ -62,7 +58,15 @@ contract TalentirMarketplaceV1 is
         uint256 quantity;
     }
 
-    /// @dev This is used for a "stack to deep" error optimization
+    /// @dev Internal OrderBook struct representing on specific tokenID
+    struct OrderBook {
+        /// @dev The price tree. Contains all available sorted prices for the token
+        RBTLibrary.Tree priceTree;
+        /// @dev price -> Linkedlist of orderIds. Each list contains all orders at specific price.
+        mapping(uint256 => LinkedListLibrary.LinkedList) orderList;
+    }
+
+    /// @dev Internal Struct. This is used for a "stack to deep" error optimization
     struct OrderExecutedLocals {
         address seller;
         address buyer;
@@ -79,16 +83,32 @@ contract TalentirMarketplaceV1 is
     }
 
     /// MEMBERS ///
-    /// @dev tokenId => Side => OrderBook
-    mapping(uint256 => mapping(Side => OrderBook)) internal markets;
-    /// @dev OrderId => Order
+    /// @notice OrderId => Order
     mapping(uint256 => Order) public orders;
+
+    /// @notice Address of the corresponding ERC1155 contract
     address public talentirNFT;
+
+    /// @notice Current Marketplace Fee. 100% = 100 000
     uint256 public talentirFeePercent;
+
+    /// @notice Address of the wallet receiving the marketplace fee
     address public talentirFeeWallet;
-    uint256 public nextOrderId = 1;
+
+    /// @notice The constant represnting 100%
     uint256 public constant PERCENT = 100_000;
+
+    /// @notice This is the price factor. Public prices in this contract always represent 100% of
+    /// the available quantity. This can be used to calculate the price for a single token.
     uint256 public constant PRICE_FACTOR = 1_000_000;
+
+    /// @dev the next available order id
+    uint256 private nextOrderId = 1;
+
+    /// @dev tokenId => Side => OrderBook
+    mapping(uint256 => mapping(Side => OrderBook)) private _markets;
+
+    /// @dev internal flag to enable receiving tokens
     bool private _contractCanReceiveToken = false;
 
     /// EVENTS ///
@@ -163,39 +183,37 @@ contract TalentirMarketplaceV1 is
         talentirNFT = _talentirNFT;
     }
 
-    /// VIEW FUNCTIONS ///
+    /// PUBLIC FUNCTIONS ///
 
     /// @notice Return the best `_side` (buy=0, sell=1) order for token `_tokenId`
     /// @dev Return the best `_side` (buy=0, sell=1) order for token `_tokenId`
     /// @param _tokenId token Id (ERC1155)
-    /// @return uint256 Id of best order
-    /// @return uint256 price of best order
-    function getBestOrder(uint256 _tokenId, Side _side) public view returns (uint256, uint256) {
-        uint256 price = _side == Side.BUY
-            ? markets[_tokenId][_side].priceTree.last()
-            : markets[_tokenId][_side].priceTree.first();
+    /// @param _side Side of order (buy=0, sell=1)
+    /// @return orderId of best order
+    /// @return price price of best order. This is the price for 100% of the quantity.
+    function getBestOrder(uint256 _tokenId, Side _side) public view returns (uint256 orderId, uint256 price) {
+        price = _side == Side.BUY
+            ? _markets[_tokenId][_side].priceTree.last()
+            : _markets[_tokenId][_side].priceTree.first();
         uint256 bestOrderId;
-        (, bestOrderId, ) = markets[_tokenId][_side].orderList[price].getNode(0);
-        return (bestOrderId, price);
+        (, bestOrderId, ) = _markets[_tokenId][_side].orderList[price].getNode(0);
+        orderId = bestOrderId;
     }
 
-    ///   @notice Computes the fee amount to be paid to Talentir for a transaction of size `_totalPaid`
-    ///  @dev Computes the fee amount to be paid for a transaction of size `_totalPaid`.
-    ///   @param _totalPaid price*volume
-    ///   @return uint256 fee
+    /// @notice Computes the fee amount to be paid to Talentir for a transaction of size `_totalPaid`
+    /// @dev Computes the fee amount to be paid for a transaction of size `_totalPaid`.
+    /// @param _totalPaid price*volume
+    /// @return uint256 fee
     function calcTalentirFee(uint256 _totalPaid) public view returns (uint256) {
         return (talentirFeePercent * _totalPaid) / PERCENT;
     }
 
-    /// PUBLIC FUNCTIONS ///
-
-    /// @notice Sell `tokenQuantity` of token `tokenId` for min `ETHquantity` total price. (ERC1155)
-    /// @dev Sell `tokenQuantity` of token `tokenId` for min `ETHquantity` total price. (ERC1155)
-    /// @dev Price limit (`ETHquantity`) must always be included to prevent frontrunning.
-    /// @dev Sender address must be able to receive Ether, otherwise funds may be lost (ony relevant if sent from a smart contract)
-    /// @dev Does NOT work for ERC20!.
-    /// @dev can emit multiple OrderExecuted events.
-    /// @param _for recipient who will receive the token (msg.sender must be approved to send token on behalf of _for)
+    /// @notice Sell `tokenQuantity` of token `tokenId` for min `ethQuantity` total price. (ERC1155)
+    /// @dev Sell `tokenQuantity` of token `tokenId` for min `ethQuantity` total price. (ERC1155)
+    /// @dev Price limit (`ethQuantity`) must always be included to prevent frontrunning.
+    /// @dev Can emit multiple OrderExecuted events.
+    /// @param from address that will send the ERC1155 and receive the ETH on successful sale
+    /// (msg.sender must be approved to send token on behalf of for)
     /// @param tokenId token Id (ERC1155)
     /// @param ethQuantity total ETH demanded (quantity*minimum price per unit)
     /// @param tokenQuantity how much to sell in total of token
@@ -203,23 +221,21 @@ contract TalentirMarketplaceV1 is
     /// @param useAsyncTransfer use async transfer for ETH and ERC1155 transfers. Typically should
     /// be false but can be useful in case the ETH or ERC1155 transfer is blocked by the recipient
     function makeSellOrder(
-        address _for,
+        address from,
         uint256 tokenId,
         uint256 ethQuantity,
         uint256 tokenQuantity,
         bool addUnfilledOrderToOrderbook,
         bool useAsyncTransfer
     ) external whenNotPaused nonReentrant {
-        _makeOrder(_for, tokenId, Side.SELL, ethQuantity, tokenQuantity, addUnfilledOrderToOrderbook, useAsyncTransfer);
+        _makeOrder(from, tokenId, Side.SELL, ethQuantity, tokenQuantity, addUnfilledOrderToOrderbook, useAsyncTransfer);
     }
 
     /// @notice Buy `tokenQuantity` of token `tokenId` for max `msg.value` total price.
     /// @dev Buy `tokenQuantity` of token `tokenId` for max `msg.value` total price.
     /// @dev Price limit must always be included to prevent frontrunning.
-    /// @dev Sender address must be able to receive Ether, otherwise funds may be lost (ony relevant if sent from a smart contract)
-    /// @dev Does NOT work for ERC20!.
-    /// @dev can emit multiple OrderExecuted events.
-    /// @param _for recipient who will receive the token (can be different from msg.sender)
+    /// @dev Can emit multiple OrderExecuted events.
+    /// @param from address that will receive the ERC1155 token on successfull purchase
     /// @param tokenId token Id (ERC1155)
     /// @param tokenQuantity how much to buy in total of token
     /// @param addUnfilledOrderToOrderbook add order to order list at a limit price of WETHquantity/tokenQuantity if it can't be filled
@@ -227,13 +243,13 @@ contract TalentirMarketplaceV1 is
     /// be false but can be useful in case the ETH or ERC1155 transfer is blocked by the recipient
     /// @dev `msg.value` total ETH offered (quantity*maximum price per unit)
     function makeBuyOrder(
-        address _for,
+        address from,
         uint256 tokenId,
         uint256 tokenQuantity,
         bool addUnfilledOrderToOrderbook,
         bool useAsyncTransfer
     ) external payable whenNotPaused nonReentrant {
-        _makeOrder(_for, tokenId, Side.BUY, msg.value, tokenQuantity, addUnfilledOrderToOrderbook, useAsyncTransfer);
+        _makeOrder(from, tokenId, Side.BUY, msg.value, tokenQuantity, addUnfilledOrderToOrderbook, useAsyncTransfer);
     }
 
     /// @notice Cancel orders: `orders`
@@ -255,13 +271,13 @@ contract TalentirMarketplaceV1 is
 
             if (useAsyncTransfer) {
                 if (side == Side.BUY) {
-                    _asyncTransfer(order.sender, price * quantity / PRICE_FACTOR);
+                    _asyncTransfer(order.sender, (price * quantity) / PRICE_FACTOR);
                 } else {
                     _asyncTokenTransferFrom(tokenId, address(this), order.sender, quantity);
                 }
             } else {
                 if (side == Side.BUY) {
-                    _ethTransfer(order.sender, price * quantity / PRICE_FACTOR);
+                    _ethTransfer(order.sender, (price * quantity) / PRICE_FACTOR);
                 } else {
                     _tokenTransferFrom(tokenId, address(this), order.sender, quantity);
                 }
@@ -322,7 +338,7 @@ contract TalentirMarketplaceV1 is
         require(_ethQuantity > 0, "Price must be positive");
         require(_tokenQuantity > 0, "Token quantity must be positive");
         require(_tokenQuantity <= 1_000_000, "Token quantity too high");
-        uint256 price = _ethQuantity * PRICE_FACTOR / _tokenQuantity;
+        uint256 price = (_ethQuantity * PRICE_FACTOR) / _tokenQuantity;
         require(price > 0, "Rounding problem");
         uint256 bestPrice;
         uint256 bestOrderId;
@@ -376,7 +392,7 @@ contract TalentirMarketplaceV1 is
 
         locals.quantity = _quantity;
         locals.useAsyncTransfer = _useAsyncTransfer;
-        locals.cost = order.price * _quantity / PRICE_FACTOR;
+        locals.cost = (order.price * _quantity) / PRICE_FACTOR;
 
         (locals.royaltiesReceiver, locals.royalties) = IERC2981(talentirNFT).royaltyInfo(order.tokenId, locals.cost);
 
@@ -444,12 +460,15 @@ contract TalentirMarketplaceV1 is
         if (_side == Side.SELL) {
             _tokenTransferFrom(_tokenId, _sender, address(this), _quantity);
         }
+
         // Check if orders already exist at that price, otherwise add tree entry
-        if (!markets[_tokenId][_side].priceTree.exists(_price)) {
-            markets[_tokenId][_side].priceTree.insert(_price);
+        if (!_markets[_tokenId][_side].priceTree.exists(_price)) {
+            _markets[_tokenId][_side].priceTree.insert(_price);
         }
+
         // Add order to FIFO linked list at _price
-        markets[_tokenId][_side].orderList[_price].push(nextOrderId, true);
+        _markets[_tokenId][_side].orderList[_price].push(nextOrderId, true);
+
         // add order to order mapping
         orders[nextOrderId] = Order({
             orderId: nextOrderId,
@@ -461,6 +480,7 @@ contract TalentirMarketplaceV1 is
         });
 
         emit OrderAdded(nextOrderId, _sender, _tokenId, _side, _price, _quantity);
+
         unchecked {
             nextOrderId++;
         }
@@ -473,11 +493,13 @@ contract TalentirMarketplaceV1 is
         Side side = orders[_orderId].side;
 
         // remove order from linked list
-        markets[tokenId][side].orderList[price].pop(false);
+        _markets[tokenId][side].orderList[price].pop(false);
+
         // if this was the last remaining order, remove node from red-black tree
-        if (!markets[tokenId][side].orderList[price].listExists()) {
-            markets[tokenId][side].priceTree.remove(price);
+        if (!_markets[tokenId][side].orderList[price].listExists()) {
+            _markets[tokenId][side].priceTree.remove(price);
         }
+
         // remove from order mapping
         delete (orders[_orderId]);
     }
@@ -490,6 +512,7 @@ contract TalentirMarketplaceV1 is
         _contractCanReceiveToken = false;
     }
 
+    /// @dev Initiates an asynchronous transfer of tokens.
     function _asyncTokenTransferFrom(
         uint256 tokenId,
         address from,
@@ -501,13 +524,15 @@ contract TalentirMarketplaceV1 is
         _contractCanReceiveToken = false;
     }
 
+    /// @dev Initiates an direct transfer of ETH.
     function _ethTransfer(address to, uint256 weiCount) private {
         (bool success, ) = to.call{value: weiCount}("");
         require(success, "Transfer failed");
     }
 
     /// OVERRIDE FUNCTIONS ///
-    /// ERC1155Receiver ///
+
+    /// @dev This contract can only receive tokens when executing an order.
     function onERC1155Received(
         address,
         address,
@@ -520,6 +545,7 @@ contract TalentirMarketplaceV1 is
         return this.onERC1155Received.selector;
     }
 
+    /// @dev This contract can't receive batch transfers.
     function onERC1155BatchReceived(
         address,
         address,
@@ -527,7 +553,6 @@ contract TalentirMarketplaceV1 is
         uint256[] calldata,
         bytes calldata
     ) public virtual override returns (bytes4) {
-        // This contract can't receive batch transfers
         return 0;
     }
 }
