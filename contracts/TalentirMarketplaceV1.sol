@@ -62,8 +62,6 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     mapping(uint256 => mapping(Side => OrderBook)) internal markets;
     /// @dev OrderId => Order
     mapping(uint256 => Order) public orders;
-    /// @dev User => Linked list of open orders by user
-    mapping(address => LinkedListLibrary.LinkedList) internal userOrders;
     address public talentirNFT;
     uint256 public talentirFeePercent;
     address public talentirFeeWallet;
@@ -369,7 +367,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
             price: _price,
             quantity: _quantity
         });
-        userOrders[_sender].push(nextOrderId, true);
+
         emit OrderAdded(nextOrderId, _sender, _tokenId, _side, _price, _quantity);
         unchecked {
             nextOrderId++;
@@ -381,8 +379,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         uint256 price = orders[_orderId].price;
         uint256 tokenId = orders[_orderId].tokenId;
         Side side = orders[_orderId].side;
-        // remove from userOrders linked list
-        userOrders[orders[_orderId].sender].remove(_orderId);
+
         // remove order from linked list
         markets[tokenId][side].orderList[price].pop(false);
         // if this was the last remaining order, remove node from red-black tree
