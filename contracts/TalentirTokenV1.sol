@@ -105,6 +105,8 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
         _mint(to, tokenId, TOKEN_FRACTIONS, "");
 
         // Pre-approve marketplace contract (can be revoked by talent)
+        // This is necessary, so the market place can move the tokens on behalf of the user when posting
+        // the first sell order.
         _setApprovalForAll(to, _approvedMarketplace, true);
 
         // Pre-approve minter role, so first sell order can automatically be executed at the end
