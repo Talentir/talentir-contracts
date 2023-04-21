@@ -14,6 +14,7 @@ import {DefaultOperatorFilterer} from "operator-filter-registry/src/DefaultOpera
 contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFilterer, Ownable, Pausable {
     /// MEMBERS ///
     mapping(uint256 => string) private _tokenCIDs; // storing the IPFS CIDs
+    mapping(string => bool) internal _cids;
     address private _approvedMarketplace;
     address private _minterAddress;
     uint256 public constant TOKEN_FRACTIONS = 1_000_000;
@@ -97,9 +98,13 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
         address talent,
         bool mintWithPresale
     ) public onlyMinter whenNotPaused {
+        require(bytes(cid).length > 0, "cid is empty");
+        require(bytes(contentID).length > 0, "contentID is empty");
+        require(_cids[cid] == false, "Token CID already used");
         uint256 tokenId = contentIdToTokenId(contentID);
         require(bytes(_tokenCIDs[tokenId]).length == 0, "Token already minted");
         isOnPresale[tokenId] = mintWithPresale;
+        _cids[cid] = true;
         _tokenCIDs[tokenId] = cid;
         _setTalent(tokenId, talent);
         _mint(to, tokenId, TOKEN_FRACTIONS, "");
@@ -119,6 +124,7 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     /// @param user The user to set the allowance for.
     /// @param allowance The allowance to set.
     function setGlobalPresaleAllowance(address user, bool allowance) public onlyMinter {
+        require(user != address(0), "User is zero");
         require(hasGlobalPresaleAllowance[user] != allowance, "Already set");
         hasGlobalPresaleAllowance[user] = allowance;
         emit GlobalPresaleAllowanceSet(user, allowance);
@@ -130,6 +136,8 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     /// @param tokenId The token to set the allowance for.
     /// @param allowance The allowance to set.
     function setTokenPresaleAllowance(address user, uint256 tokenId, bool allowance) public onlyMinter {
+        require(user != address(0), "User is zero");
+        require(_talents[tokenId] != address(0), "tokenId not found");
         require(hasTokenPresaleAllowance[user][tokenId] != allowance, "Already set");
         hasTokenPresaleAllowance[user][tokenId] = allowance;
         emit TokenPresaleAllowanceSet(user, tokenId, allowance);
@@ -170,6 +178,8 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     /// @param minterAddress The new minter address.
     /// @param approvedUsers Users who have the old minter address approved. Approval will be removed.
     function setMinterRole(address minterAddress, address[] memory approvedUsers) public onlyOwner {
+        require(minterAddress != address(0), "Minter is zero");
+
         for (uint i = 0; i < approvedUsers.length; i++) {
             _setApprovalForAll(approvedUsers[i], _minterAddress, false);
         }
@@ -183,6 +193,8 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     /// @param marketplace The new marketplace address.
     /// @param approvedUsers Users who have the old marketplace approved. Approval will be removed.
     function setMarketplace(address marketplace, address[] memory approvedUsers) public onlyOwner {
+        require(marketplace != address(0), "Marketplace is zero");
+        
         for (uint i = 0; i < approvedUsers.length; i++) {
             _setApprovalForAll(approvedUsers[i], _approvedMarketplace, false);
         }
@@ -242,6 +254,7 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
 
     /// INTERNAL FUNCTIONS ///
     function _setTalent(uint256 tokenID, address talent) internal {
+        require(talent != address(0), "Talent is zero");
         address from = _talents[tokenID];
         _talents[tokenID] = talent;
         emit TalentChanged(from, talent, tokenID);
