@@ -129,7 +129,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     ///   @param _totalPaid price*volume
     ///   @return uint256 fee
     function calcTalentirFee(uint256 _totalPaid) public view returns (uint256) {
-        return ((100 * talentirFeePercent * _totalPaid) / PERCENT) / 100;
+        return talentirFeePercent * _totalPaid / PERCENT;
     }
 
     /// PUBLIC FUNCTIONS ///
