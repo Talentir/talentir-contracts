@@ -50,7 +50,7 @@ describe('Marketplace Tests', function () {
     )
     // Non-token owner can't place sell order
     await expect(
-      marketplace.connect(seller).makeSellOrder(seller.address, 1, 1, 1, true)
+      marketplace.connect(seller).makeSellOrder(seller.address, 1, 1, 1, true, false)
     ).to.be.revertedWith('ERC1155: caller is not token owner or approved')
     // Mint token to seller
     await talentirNFT.mint(
@@ -69,44 +69,44 @@ describe('Marketplace Tests', function () {
     await expect(
       marketplace
         .connect(seller)
-        .makeSellOrder(seller.address, tokenId, oneEther, 0, true)
+        .makeSellOrder(seller.address, tokenId, oneEther, 0, true, false)
     ).to.be.revertedWith('Token quantity must be positive')
     await expect(
       marketplace
         .connect(seller)
-        .makeSellOrder(seller.address, tokenId, 0, 1, true)
+        .makeSellOrder(seller.address, tokenId, 0, 1, true, false)
     ).to.be.revertedWith('Price must be positive')
     await expect(
       marketplace
         .connect(seller)
-        .makeSellOrder(seller.address, tokenId, 0, 0, true)
+        .makeSellOrder(seller.address, tokenId, 0, 0, true, false)
     ).to.be.revertedWith('Price must be positive')
     await expect(
       marketplace
         .connect(buyer)
-        .makeBuyOrder(buyer.address, tokenId, 0, false, { value: 1000 })
+        .makeBuyOrder(buyer.address, tokenId, 0, false, false, { value: 1000 })
     ).to.be.revertedWith('Token quantity must be positive')
     await expect(
       marketplace
         .connect(buyer)
-        .makeBuyOrder(buyer.address, tokenId, 1, false, { value: 0 })
+        .makeBuyOrder(buyer.address, tokenId, 1, false, false, { value: 0 })
     ).to.be.revertedWith('Price must be positive')
     await expect(
       marketplace
         .connect(buyer)
-        .makeBuyOrder(buyer.address, tokenId, 0, false, { value: 0 })
+        .makeBuyOrder(buyer.address, tokenId, 0, false, false, { value: 0 })
     ).to.be.revertedWith('Price must be positive')
     // Can't add order with rounding problem
     await expect(
       marketplace
         .connect(seller)
-        .makeSellOrder(seller.address, tokenId, 1, 2, true)
+        .makeSellOrder(seller.address, tokenId, 1, 2, true, false)
     ).to.be.revertedWith('Rounding problem')
     // Add order to orderbook
     await expect(
       marketplace
         .connect(seller)
-        .makeSellOrder(seller.address, tokenId, oneEther, 1, true)
+        .makeSellOrder(seller.address, tokenId, oneEther, 1, true, false)
     ).to.emit(marketplace, 'OrderAdded')
     let orderID = await marketplace.getBestOrder(tokenId, SELL)
     let order = await marketplace.orders(orderID[0])
@@ -129,7 +129,7 @@ describe('Marketplace Tests', function () {
       async () =>
         await marketplace
           .connect(buyer)
-          .makeBuyOrder(buyer.address, tokenId, 1, false, { value: 1000 })
+          .makeBuyOrder(buyer.address, tokenId, 1, false, false, { value: 1000 })
     ).to.changeEtherBalances([buyer, marketplace], [0, 0])
     orderID = await marketplace.getBestOrder(tokenId, BUY)
     order = await marketplace.orders(orderID[0])
@@ -143,7 +143,7 @@ describe('Marketplace Tests', function () {
       async () =>
         await marketplace
           .connect(buyer)
-          .makeBuyOrder(buyer.address, tokenId, 1, true, { value: 1000 })
+          .makeBuyOrder(buyer.address, tokenId, 1, true, false, { value: 1000 })
     ).to.changeEtherBalances([buyer, marketplace], [-1000, 1000])
     orderID = await marketplace.getBestOrder(tokenId, BUY)
     order = await marketplace.orders(orderID[0])
@@ -157,7 +157,7 @@ describe('Marketplace Tests', function () {
     // Buyer makes a buy order with higher price than asked, executes, removes executed order and refunds the excess Ether
     const buyTransaction = marketplace
       .connect(buyer)
-      .makeBuyOrder(buyer.address, tokenId, 1, false, {
+      .makeBuyOrder(buyer.address, tokenId, 1, false, false, {
         value: oneEther.mul(2)
       })
 
@@ -196,7 +196,7 @@ describe('Marketplace Tests', function () {
     // Create a sell order that fills the buy order
     const transaction = marketplace
       .connect(seller)
-      .makeSellOrder(seller.address, tokenId, 1000, 1, false)
+      .makeSellOrder(seller.address, tokenId, 1000, 1, false, false)
 
     await expect(transaction).to.emit(marketplace, 'OrderExecuted')
 
@@ -270,11 +270,11 @@ describe('Marketplace Tests', function () {
     await expect(
       marketplace
         .connect(seller)
-        .makeSellOrder(seller.address, tokenId, 1000, 1, true)
+        .makeSellOrder(seller.address, tokenId, 1000, 1, true, false)
     ).to.emit(marketplace, 'OrderAdded')
     const transaction = marketplace
       .connect(buyer)
-      .makeBuyOrder(buyer.address, tokenId, 1, true, { value: 1000 })
+      .makeBuyOrder(buyer.address, tokenId, 1, true, false, { value: 1000 })
 
     await expect(transaction).to.emit(marketplace, 'OrderExecuted')
 
@@ -312,13 +312,14 @@ describe('Marketplace Tests', function () {
             tokenId,
             oneEther.mul(2 * i).add(oneEther.mul(20)),
             2,
-            true
+            true,
+            false
           )
       ).to.emit(marketplace, 'OrderAdded')
 
       const transaction = marketplace
         .connect(buyer)
-        .makeBuyOrder(buyer.address, tokenId, 2, true, {
+        .makeBuyOrder(buyer.address, tokenId, 2, true, false, {
           value: oneEther.mul(i * 2)
         })
 
@@ -335,6 +336,7 @@ describe('Marketplace Tests', function () {
       tokenId,
       2,
       true,
+      false,
       {
         value: oneEther.mul(20)
       }
@@ -352,7 +354,7 @@ describe('Marketplace Tests', function () {
     expect(bestOrder.sender).to.equal(buyer.address)
     transaction = marketplace
       .connect(seller)
-      .makeSellOrder(seller.address, tokenId, oneEther.mul(10), 2, true)
+      .makeSellOrder(seller.address, tokenId, oneEther.mul(10), 2, true, false)
 
     await expect(transaction).to.emit(marketplace, 'OrderExecuted')
 
@@ -369,7 +371,7 @@ describe('Marketplace Tests', function () {
     // Partially fill the buy orders
     transaction = marketplace
       .connect(seller)
-      .makeSellOrder(seller.address, tokenId, oneEther, 1, false)
+      .makeSellOrder(seller.address, tokenId, oneEther, 1, false, false)
 
     await expect(transaction).to.emit(marketplace, 'OrderExecuted')
 
@@ -385,7 +387,7 @@ describe('Marketplace Tests', function () {
     // Partially fill the sell orders
     transaction = marketplace
       .connect(buyer)
-      .makeBuyOrder(buyer.address, tokenId, 1, false, {
+      .makeBuyOrder(buyer.address, tokenId, 1, false, false, {
         value: oneEther.mul(15)
       })
 
@@ -403,7 +405,7 @@ describe('Marketplace Tests', function () {
     // Overfill the buy orders
     transaction = marketplace
       .connect(seller)
-      .makeSellOrder(seller.address, tokenId, oneEther, 2, false)
+      .makeSellOrder(seller.address, tokenId, oneEther, 2, false, false)
 
     await expect(transaction).to.emit(marketplace, 'OrderExecuted')
 
@@ -419,7 +421,7 @@ describe('Marketplace Tests', function () {
     // Overfill the sell orders
     transaction = marketplace
       .connect(buyer)
-      .makeBuyOrder(buyer.address, tokenId, 2, false, {
+      .makeBuyOrder(buyer.address, tokenId, 2, false, false, {
         value: oneEther.mul(50)
       })
 
@@ -452,7 +454,7 @@ describe('Marketplace Tests', function () {
     )
 
     await expect(
-      marketplace.connect(user).makeSellOrder(user.address, tokenId, oneEther, 1, true)
+      marketplace.connect(user).makeSellOrder(user.address, tokenId, oneEther, 1, true, false)
     ).to.emit(marketplace, 'OrderAdded')
 
     // Make buy order
@@ -461,6 +463,7 @@ describe('Marketplace Tests', function () {
       tokenId,
       1,
       true,
+      false,
       {
         value: 1
       }
@@ -481,19 +484,19 @@ describe('Marketplace Tests', function () {
     await expect(marketplace.pause()).to.emit(marketplace, 'Paused')
     // Can't make buy or sell orders
     await expect(
-      marketplace.connect(user).makeBuyOrder(owner.address, tokenId, 1, true, {
+      marketplace.connect(user).makeBuyOrder(owner.address, tokenId, 1, true, false, {
         value: oneEther
       })
     ).to.be.revertedWith('Pausable: paused')
     await expect(
-      marketplace.connect(user).makeSellOrder(owner.address, tokenId, oneEther, 1, true)
+      marketplace.connect(user).makeSellOrder(owner.address, tokenId, oneEther, 1, true, false)
     ).to.be.revertedWith('Pausable: paused')
     // Other user can't cancel order on behalf of others
     await expect(
-      marketplace.connect(buyer).cancelOrders([1])
+      marketplace.connect(buyer).cancelOrders([1], false)
     ).to.be.revertedWith('Wrong user')
     // Can still cancel orders
-    transaction = marketplace.connect(user).cancelOrders([1, 2])
+    transaction = marketplace.connect(user).cancelOrders([1, 2], false)
 
     await expect(transaction).to.emit(marketplace, 'OrderCancelled')
 
@@ -536,9 +539,9 @@ describe('Marketplace Tests', function () {
     await expect(marketplace.unpause()).to.emit(marketplace, 'Unpaused')
     // Can make orders again
     await expect(
-      marketplace.connect(user).makeSellOrder(user.address, tokenId, oneEther, 1, true)
+      marketplace.connect(user).makeSellOrder(user.address, tokenId, oneEther, 1, true, false)
     ).to.emit(marketplace, 'OrderAdded')
-    transaction = marketplace.connect(user).makeBuyOrder(user.address, tokenId, 1, true, {
+    transaction = marketplace.connect(user).makeBuyOrder(user.address, tokenId, 1, true, false, {
       value: 1
     })
 
@@ -572,11 +575,11 @@ describe('Marketplace Tests', function () {
     await expect(
       marketplace
         .connect(seller)
-        .makeSellOrder(seller.address, tokenId, oneEther, 1, true)
+        .makeSellOrder(seller.address, tokenId, oneEther, 1, true, false)
     ).to.emit(marketplace, 'OrderAdded')
     // Other account can't add order
     await expect(
-      marketplace.connect(sellAgent).makeSellOrder(seller.address, tokenId, oneEther, 1, true)
+      marketplace.connect(sellAgent).makeSellOrder(seller.address, tokenId, oneEther, 1, true, false)
     ).to.be.revertedWith('Not allowed')
     // Approve owner
     await expect(
@@ -584,7 +587,7 @@ describe('Marketplace Tests', function () {
     ).to.emit(talentirNFT, 'ApprovalForAll')
     // Owner can make sell offer on behalf of seller
     await expect(
-      marketplace.connect(sellAgent).makeSellOrder(seller.address, tokenId, oneEther, 1, true)
+      marketplace.connect(sellAgent).makeSellOrder(seller.address, tokenId, oneEther, 1, true, false)
     ).to.emit(marketplace, 'OrderAdded')
     // Revoke approval
     await expect(
@@ -592,7 +595,227 @@ describe('Marketplace Tests', function () {
     ).to.emit(talentirNFT, 'ApprovalForAll')
     // Can't add order again
     await expect(
-      marketplace.connect(sellAgent).makeSellOrder(seller.address, tokenId, oneEther, 1, true)
+      marketplace.connect(sellAgent).makeSellOrder(seller.address, tokenId, oneEther, 1, true, false)
     ).to.be.revertedWith('Not allowed')
+  })
+
+  it('async transfer / pull payment', async function () {
+    const royaltyPercent = 10
+    const talentirFeePercent = 10
+
+    await talentirNFT.setRoyalty(royaltyPercent * 1000)
+    await marketplace.setTalentirFee(talentirFeePercent * 1000, talentirFeeReceiver.address)
+
+    await talentirNFT.mint(
+      seller.address,
+      'abcd',
+      'abc',
+      royaltyReceiver.address,
+      false
+    )
+
+    const tokenId = await talentirNFT.contentIdToTokenId('abc')
+
+    expect(await talentirNFT.balanceOf(seller.address, tokenId)).to.equal(
+      1_000_000
+    )
+
+    // Add sell order to orderbook
+    await expect(
+      marketplace
+        .connect(seller)
+        .makeSellOrder(seller.address, tokenId, oneEther, 1_000, true, true)
+    ).to.emit(marketplace, 'OrderAdded')
+
+    // Add cheaper buy order to orderbook
+    await expect(
+      marketplace
+        .connect(buyer)
+        .makeBuyOrder(buyer.address, tokenId, 1_000, true, true, {
+          value: oneEther.div(2)
+        })
+    ).to.emit(marketplace, 'OrderAdded')
+
+    // Execute partial Sell Order. Seller is caller.
+    {
+      const quantity = 500
+      const cost = oneEther.div(4)
+      const price = cost.div(quantity)
+      const royalties = cost.mul(royaltyPercent).div(100)
+      const fee = cost.mul(talentirFeePercent).div(100)
+      const paidToSeller = cost.sub(royalties).sub(fee)
+
+      // sell into order
+      await expect(
+        marketplace
+          .connect(seller)
+          .makeSellOrder(seller.address, tokenId, cost, quantity, true, true)
+      ).to.emit(marketplace, 'OrderExecuted').withNamedArgs({
+        orderId: 2,
+        buyer: buyer.address,
+        seller: seller.address,
+        paidToSeller,
+        price,
+        royalties,
+        royaltiesReceiver: royaltyReceiver.address,
+        quantity,
+        remainingQuantity: 500,
+        asyncTransfer: true
+      })
+
+      // Royalty Receiver can withdraw correct amount
+      await expect(await marketplace.withdrawPayments(royaltyReceiver.address)).to.changeEtherBalance(
+        royaltyReceiver,
+        royalties
+      )
+
+      // Seller can withdraw correct amount
+      await expect(await marketplace.withdrawPayments(seller.address)).to.changeEtherBalance(
+        seller,
+        paidToSeller
+      )
+
+      // Fee Receiver can withdraw correct amount
+      await expect(await marketplace.withdrawPayments(talentirFeeReceiver.address)).to.changeEtherBalance(
+        talentirFeeReceiver,
+        fee
+      )
+
+      // Buyer can withdraw correct amount
+      await marketplace.withdrawTokens(buyer.address, tokenId)
+      expect(await talentirNFT.balanceOf(buyer.address, tokenId)).to.equal(quantity)
+    }
+
+    // Execute partial Buy Order. Buyer is caller.
+    {
+      const quantity = 500
+      const cost = oneEther.div(2)
+      const price = cost.div(quantity)
+      const royalties = cost.mul(royaltyPercent).div(100)
+      const fee = cost.mul(talentirFeePercent).div(100)
+      const paidToSeller = cost.sub(royalties).sub(fee)
+
+      await expect(
+        marketplace
+          .connect(buyer)
+          .makeBuyOrder(buyer.address, tokenId, quantity, true, true, {
+            value: cost
+          })
+      ).to.emit(marketplace, 'OrderExecuted')
+        .withNamedArgs({
+          orderId: 1,
+          buyer: buyer.address,
+          seller: seller.address,
+          paidToSeller,
+          price,
+          royalties,
+          royaltiesReceiver: royaltyReceiver.address,
+          quantity,
+          remainingQuantity: 500,
+          asyncTransfer: true
+        })
+
+      // Royalty Receiver can withdraw correct amount
+      await expect(await marketplace.withdrawPayments(royaltyReceiver.address)).to.changeEtherBalance(
+        royaltyReceiver,
+        royalties
+      )
+
+      // Seller can withdraw correct amount
+      await expect(await marketplace.withdrawPayments(seller.address)).to.changeEtherBalance(
+        seller,
+        paidToSeller
+      )
+
+      // Fee Receiver can withdraw correct amount
+      await expect(await marketplace.withdrawPayments(talentirFeeReceiver.address)).to.changeEtherBalance(
+        talentirFeeReceiver,
+        fee
+      )
+
+      // Buyer can withdraw correct amount
+      const buyerBalanceBefore = await talentirNFT.balanceOf(buyer.address, tokenId)
+      await marketplace.withdrawTokens(buyer.address, tokenId)
+      const buyerBalanceAfter = await talentirNFT.balanceOf(buyer.address, tokenId)
+      expect(buyerBalanceAfter.sub(buyerBalanceBefore)).to.equal(quantity)
+    }
+
+    // Cancel Remaining Sell Order
+    {
+      const orderId = 1
+      const quantity = 500
+
+      await expect(
+        marketplace
+          .connect(seller)
+          .cancelOrders([1], true)
+      ).to.emit(marketplace, 'OrderCancelled')
+        .withNamedArgs({
+          orderId,
+          from: seller.address,
+          asyncTransfer: true
+        })
+
+      // Seller can withdraw correct token amount
+      const sellerBalanceBefore = await talentirNFT.balanceOf(seller.address, tokenId)
+      await marketplace.withdrawTokens(seller.address, tokenId)
+      const sellerBalanceAfter = await talentirNFT.balanceOf(seller.address, tokenId)
+      expect(sellerBalanceAfter.sub(sellerBalanceBefore)).to.equal(quantity)
+    }
+
+    // Cancel Remaining Buy Order
+    {
+      const orderId = 2
+
+      await expect(
+        marketplace
+          .connect(buyer)
+          .cancelOrders([2], true)
+      ).to.emit(marketplace, 'OrderCancelled')
+        .withNamedArgs({
+          orderId,
+          from: buyer.address,
+          asyncTransfer: true
+        })
+
+      // Buyer can withdraw correct ether amount
+      await expect(await marketplace.withdrawPayments(buyer.address)).to.changeEtherBalance(
+        buyer,
+        oneEther.div(4)
+      )
+    }
+  })
+
+  it('owner can cancel orders', async function () {
+    await talentirNFT.mint(
+      seller.address,
+      'abcd',
+      'abc',
+      royaltyReceiver.address,
+      false
+    )
+
+    const tokenId = await talentirNFT.contentIdToTokenId('abc')
+
+    await marketplace.connect(seller).makeSellOrder(
+      seller.address,
+      tokenId,
+      oneEther,
+      1_000,
+      true,
+      false
+    )
+
+    // Owner can cancel
+    await expect(
+      marketplace
+        .connect(owner)
+        .cancelOrders([1], true)
+    ).to.emit(marketplace, 'OrderCancelled')
+      .withNamedArgs({
+        orderId: 1,
+        from: seller.address,
+        asyncTransfer: true
+      })
   })
 })
