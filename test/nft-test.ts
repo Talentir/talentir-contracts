@@ -47,15 +47,48 @@ describe('TalentirNFT', function () {
     ).to.be.revertedWith('Not allowed')
 
     await expect(
+      talentir.setMinterRole(ethers.constants.AddressZero)
+    ).to.be.revertedWith('Minter is zero')
+
+    await expect(
       talentir.connect(luki).setMinterRole(minter.address)
     ).to.be.revertedWith('Ownable: caller is not the owner')
-    await talentir.setMinterRole(minter.address)
+
+    await expect(talentir.setMinterRole(luki.address))
+      .to.emit(talentir, 'MinterRoleChanged')
+      .withArgs(minter.address, luki.address)
   })
 
   it('mints', async function () {
     const cid1 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU1'
+    const cid2 = 'QmPxtVYgecSPTrnkZxjP3943ue3uizWtywzH7U9QwkLHU2'
     const contentID1 = '1'
     const tokenID1 = await talentir.contentIdToTokenId(contentID1)
+
+    await expect(
+      talentir
+        .connect(minter)
+        .mint(luki.address, cid1, contentID1, ethers.constants.AddressZero, false)
+    ).to.be.revertedWith('Talent is zero')
+
+    await expect(
+      talentir
+        .connect(minter)
+        .mint(luki.address, cid1, '', luki.address, false)
+    ).to.be.revertedWith('contentID is empty')
+
+    await expect(
+      talentir
+        .connect(minter)
+        .mint(luki.address, '', contentID1, luki.address, false)
+    ).to.be.revertedWith('cid is empty')
+
+    await expect(
+      talentir
+        .connect(minter)
+        .mint(ethers.constants.AddressZero, cid1, contentID1, luki.address, false)
+    ).to.be.revertedWith('ERC1155: mint to the zero address')
+
     await expect(
       talentir
         .connect(minter)
@@ -68,8 +101,14 @@ describe('TalentirNFT', function () {
     await expect(
       talentir
         .connect(minter)
-        .mint(luki.address, cid1, contentID1, luki.address, false)
+        .mint(luki.address, cid2, contentID1, luki.address, false)
     ).to.be.revertedWith('Token already minted')
+
+    await expect(
+      talentir
+        .connect(minter)
+        .mint(luki.address, cid1, contentID1, luki.address, false)
+    ).to.be.revertedWith('Token CID already used')
   })
 
   it('can approve a marketplace to transfer tokens', async function () {
@@ -79,14 +118,20 @@ describe('TalentirNFT', function () {
     await talentir.setMinterRole(minter.address)
 
     await expect(
+      talentir.setMarketplace(ethers.constants.AddressZero)
+    ).to.be.revertedWith('Marketplace is zero')
+
+    await expect(
       talentir.connect(luki).setMarketplace(johnny.address)
     ).to.be.revertedWith('Ownable: caller is not the owner')
 
-    await talentir.setMarketplace(johnny.address)
+    await expect(talentir.setMarketplace(johnny.address))
+      .to.emit(talentir, 'MarketplaceChanged')
+      .withArgs(ethers.constants.AddressZero, johnny.address)
 
     await talentir
       .connect(minter)
-      .mint(luki.address, '', contentID1, ethers.constants.AddressZero, false)
+      .mint(luki.address, 'a', contentID1, luki.address, false)
 
     await talentir
       .connect(johnny)
@@ -103,7 +148,7 @@ describe('TalentirNFT', function () {
     await talentir.setMinterRole(minter.address)
     await talentir
       .connect(minter)
-      .mint(luki.address, '', contentID1, ethers.constants.AddressZero, false)
+      .mint(luki.address, 'a', contentID1, luki.address, false)
 
     await expect(
       talentir
@@ -128,7 +173,7 @@ describe('TalentirNFT', function () {
     await talentir.setMinterRole(minter.address)
 
     await expect(
-      talentir.connect(minter).mint(luki.address, '', contentID, johnny.address, false)
+      talentir.connect(minter).mint(luki.address, 'a', contentID, johnny.address, false)
     )
       .to.emit(talentir, 'TalentChanged')
       .withArgs(ethers.constants.AddressZero, johnny.address, tokenID1)
@@ -161,6 +206,9 @@ describe('TalentirNFT', function () {
     await expect(talentir.connect(johnny).updateTalent(tokenID1, luki.address))
       .to.emit(talentir, 'TalentChanged')
       .withArgs(johnny.address, luki.address, tokenID1)
+
+    const talent = await talentir.getTalent(tokenID1)
+    expect(talent).to.equal(luki.address)
   })
 
   it('allows pausing', async function () {
@@ -176,7 +224,7 @@ describe('TalentirNFT', function () {
 
     await talentir
       .connect(minter)
-      .mint(johnny.address, cid1, contentID1, ethers.constants.AddressZero, false)
+      .mint(johnny.address, cid1, contentID1, johnny.address, false)
 
     await talentir
       .connect(minter)
@@ -192,13 +240,13 @@ describe('TalentirNFT', function () {
     await expect(
       talentir
         .connect(minter)
-        .mint(johnny.address, cid2, contentID2, ethers.constants.AddressZero, false)
+        .mint(johnny.address, cid2, contentID2, johnny.address, false)
     ).to.be.revertedWith('Pausable: paused')
 
     await expect(
       talentir
         .connect(minter)
-        .mint(johnny.address, cid2, contentID2, ethers.constants.AddressZero, true)
+        .mint(johnny.address, cid2, contentID2, johnny.address, true)
     ).to.be.revertedWith('Pausable: paused')
 
     await expect(
@@ -232,7 +280,7 @@ describe('TalentirNFT', function () {
     await expect(
       talentir
         .connect(minter)
-        .mint(luki.address, cid2, contentID2, ethers.constants.AddressZero, false)
+        .mint(luki.address, cid2, contentID2, luki.address, false)
     ).not.to.be.reverted
   })
 
@@ -254,10 +302,14 @@ describe('TalentirNFT', function () {
     await talentir.setMinterRole(minter.address)
 
     await expect(
-      talentir.connect(minter).mint(luki.address, '', contentID, johnny.address, false)
+      talentir.connect(minter).mint(luki.address, 'a', contentID, johnny.address, false)
     )
       .to.emit(talentir, 'TalentChanged')
       .withArgs(ethers.constants.AddressZero, johnny.address, tokenID1)
+
+    await expect(
+      talentir.connect(johnny).updateTalent(tokenID1, ethers.constants.AddressZero)
+    ).to.be.revertedWith('Talent is zero')
 
     await expect(
       talentir.connect(luki).updateTalent(tokenID1, luki.address)
@@ -371,6 +423,12 @@ describe('TalentirNFT', function () {
         .connect(luki)
         .safeBatchTransferFrom(luki.address, johnny.address, [tokenID1, tokenID2], [2, 3], '0x')).to.be.revertedWith('Not allowed in presale')
 
+    await expect(
+      talentir
+        .connect(minter)
+        .setGlobalPresaleAllowance(ethers.constants.AddressZero, true)
+    ).to.be.revertedWith('User is zero')
+
     // Only minter can set global presale allowance
     await expect(
       talentir
@@ -427,6 +485,18 @@ describe('TalentirNFT', function () {
       talentir
         .connect(luki)
         .safeBatchTransferFrom(luki.address, johnny.address, [tokenID1, tokenID2], [2, 3], '0x')).to.be.revertedWith('Not allowed in presale')
+
+    await expect(
+      talentir
+        .connect(minter)
+        .setTokenPresaleAllowance(ethers.constants.AddressZero, tokenID1, true)
+    ).to.be.revertedWith('User is zero')
+
+    await expect(
+      talentir
+        .connect(minter)
+        .setTokenPresaleAllowance(luki.address, 1234, true)
+    ).to.be.revertedWith('tokenId not found')
 
     // Only minter can set token presale allowance
     await expect(

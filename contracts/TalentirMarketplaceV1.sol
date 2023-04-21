@@ -5,7 +5,7 @@ pragma solidity 0.8.17;
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import {ERC1155Holder} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
+import {ERC1155Receiver} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Receiver.sol";
 
 /// LIBRARIES ///
 import {RBTLibrary} from "./utils/RBTLibrary.sol";
@@ -20,7 +20,7 @@ import {IERC2981} from "@openzeppelin/contracts/interfaces/IERC2981.sol";
 /// @title Talentir Marketplace Contract
 /// @author Christoph Siebenbrunner, Johannes Kares
 /// @custom:security-contact office@talentir.com
-contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Holder {
+contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Receiver {
     /// LIBRARIES ///
     using RBTLibrary for RBTLibrary.Tree;
     using LinkedListLibrary for LinkedListLibrary.LinkedList;
@@ -62,13 +62,12 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     mapping(uint256 => mapping(Side => OrderBook)) internal markets;
     /// @dev OrderId => Order
     mapping(uint256 => Order) public orders;
-    /// @dev User => Linked list of open orders by user
-    mapping(address => LinkedListLibrary.LinkedList) internal userOrders;
     address public talentirNFT;
     uint256 public talentirFeePercent;
     address public talentirFeeWallet;
     uint256 public nextOrderId = 1;
     uint256 internal constant PERCENT = 100_000;
+    bool private isInSellOrder = false;
 
     /// EVENTS ///
     event OrderAdded(
@@ -92,11 +91,20 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         uint256 remainingQuantity
     );
 
-    event OrderCancelled(uint256 orderId, address indexed from);
+    event OrderCancelled(
+        uint256 indexed orderId, 
+        address indexed from, 
+        uint256 indexed tokenId, 
+        Side side, 
+        uint256 price, 
+        uint256 quantity
+    );
+
     event TalentirFeeSet(uint256 fee, address wallet);
 
     /// CONSTRUCTOR ///
     constructor(address _talentirNFT) {
+        require(_talentirNFT != address(0), "Invalid address");
         require(IERC165(_talentirNFT).supportsInterface(type(IERC2981).interfaceId), "Must implement IERC2981");
         talentirNFT = _talentirNFT;
     }
@@ -122,7 +130,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     ///   @param _totalPaid price*volume
     ///   @return uint256 fee
     function calcTalentirFee(uint256 _totalPaid) public view returns (uint256) {
-        return ((100 * talentirFeePercent * _totalPaid) / PERCENT) / 100;
+        return talentirFeePercent * _totalPaid / PERCENT;
     }
 
     /// PUBLIC FUNCTIONS ///
@@ -176,18 +184,19 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         bool success;
         for (uint256 i = 0; i < orderIds.length; i++) {
             uint256 orderId = orderIds[i];
-            require(msg.sender == orders[orderId].sender, "Wrong user");
-            Side side = orders[orderId].side;
-            uint256 price = orders[orderId].price;
-            uint256 quantity = orders[orderId].quantity;
-            uint256 tokenId = orders[orderId].tokenId;
+            Order memory order = orders[orderId];
+            require(msg.sender == order.sender, "Wrong user");
+            Side side = order.side;
+            uint256 price = order.price;
+            uint256 quantity = order.quantity;
+            uint256 tokenId = order.tokenId;
             _removeOrder(orderId);
             if (side == Side.BUY) {
                 (success, ) = msg.sender.call{value: (price * quantity)}("");
             } else {
                 _safeTransferFrom(talentirNFT, tokenId, address(this), msg.sender, quantity);
             }
-            emit OrderCancelled(orderId, msg.sender);
+            emit OrderCancelled(orderId, order.sender, tokenId, side, price, quantity);
         }
     }
 
@@ -209,6 +218,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     /// @param _fee fee percent (100% = 100,000)
     /// @param _wallet address where Talentir fee will be sent to
     function setTalentirFee(uint256 _fee, address _wallet) external onlyOwner {
+        require(_wallet != address(0), "Wallet is zero");
         require(_fee <= PERCENT / 10, "Must be <=10k"); // Talentir fee can never be higher than 10%
         talentirFeePercent = _fee;
         talentirFeeWallet = _wallet;
@@ -239,6 +249,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         }
         require(_ethQuantity > 0, "Price must be positive");
         require(_tokenQuantity > 0, "Token quantity must be positive");
+        require(_tokenQuantity <= 1_000_000, "Token quantity too high");
         uint256 price = _ethQuantity / _tokenQuantity;
         require(price > 0, "Rounding problem");
         uint256 bestPrice;
@@ -343,7 +354,9 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     function _addOrder(uint256 _tokenId, Side _side, address _sender, uint256 _price, uint256 _quantity) internal {
         // Transfer tokens to this contract
         if (_side == Side.SELL) {
+            isInSellOrder = true;
             _safeTransferFrom(talentirNFT, _tokenId, _sender, address(this), _quantity);
+            isInSellOrder = false;
         }
         // Check if orders already exist at that price, otherwise add tree entry
         if (!markets[_tokenId][_side].priceTree.exists(_price)) {
@@ -360,7 +373,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
             price: _price,
             quantity: _quantity
         });
-        userOrders[_sender].push(nextOrderId, true);
+
         emit OrderAdded(nextOrderId, _sender, _tokenId, _side, _price, _quantity);
         unchecked {
             nextOrderId++;
@@ -372,8 +385,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
         uint256 price = orders[_orderId].price;
         uint256 tokenId = orders[_orderId].tokenId;
         Side side = orders[_orderId].side;
-        // remove from userOrders linked list
-        userOrders[orders[_orderId].sender].remove(_orderId);
+
         // remove order from linked list
         markets[tokenId][side].orderList[price].remove(_orderId);
         // if this was the last remaining order, remove node from red-black tree
@@ -394,5 +406,33 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     ) internal {
         bytes memory data;
         IERC1155(_token).safeTransferFrom(_from, _to, _tokenId, _quantity, data);
+    }
+
+    /// OVERRIDE FUNCTIONS ///
+    /// ERC1155Receiver ///
+    function onERC1155Received(
+        address,
+        address,
+        uint256,
+        uint256,
+        bytes calldata
+    ) public virtual override returns (bytes4) {
+        require(msg.sender == talentirNFT, "Only Talentir Tokens");
+        require(isInSellOrder, "Only in sell order");
+
+        return this.onERC1155Received.selector;
+    }
+
+    function onERC1155BatchReceived(
+        address,
+        address,
+        uint256[] calldata,
+        uint256[] calldata,
+        bytes calldata
+    ) public virtual override returns (bytes4) {
+        require(msg.sender == talentirNFT, "Only Talentir Tokens");
+        require(isInSellOrder, "Only in sell order");
+
+        return this.onERC1155BatchReceived.selector;
     }
 }
