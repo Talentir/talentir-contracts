@@ -28,18 +28,30 @@ describe('Marketplace Tests', function () {
     const MarketplaceFactory = await ethers.getContractFactory(
       'TalentirMarketplaceV1'
     )
-    await expect(MarketplaceFactory.deploy(owner.address)).to.be.reverted
+
     marketplace = await MarketplaceFactory.deploy(talentirNFT.address)
     await marketplace.deployed()
 
-    await talentirNFT.setMarketplace(marketplace.address)
+    await talentirNFT.setMarketplace(marketplace.address, [])
 
     // Can't mint token before minter role is set
     await expect(
       talentirNFT.mint(seller.address, 'abc', 'abc', royaltyReceiver.address, false)
     ).to.be.revertedWith('Not allowed')
     // Set minter role to owner
-    await talentirNFT.setMinterRole(owner.address)
+    await talentirNFT.setMinterRole(owner.address, [])
+  })
+
+  it('deploy', async function () {
+    const MarketplaceFactory = await ethers.getContractFactory(
+      'TalentirMarketplaceV1'
+    )
+
+    // Can't deploy if it's not a IERC2981 contract
+    await expect(MarketplaceFactory.deploy(owner.address)).to.be.reverted
+
+    await expect(MarketplaceFactory.deploy(ethers.constants.AddressZero))
+      .to.be.revertedWith('Invalid address')
   })
 
   it('should open and close a single order (no fees)', async function () {
@@ -71,6 +83,11 @@ describe('Marketplace Tests', function () {
         .connect(seller)
         .makeSellOrder(seller.address, tokenId, oneEther, 0, true, false)
     ).to.be.revertedWith('Token quantity must be positive')
+    await expect(
+      marketplace
+        .connect(seller)
+        .makeSellOrder(seller.address, tokenId, oneEther, 1_000_001, true, false)
+    ).to.be.revertedWith('Token quantity too high')
     await expect(
       marketplace
         .connect(seller)
@@ -239,6 +256,10 @@ describe('Marketplace Tests', function () {
     await expect(talentirNFT.connect(buyer).setRoyalty(1)).to.be.revertedWith(
       'Ownable: caller is not the owner'
     )
+    // Can't set zero wallet
+    await expect(
+      marketplace.setTalentirFee(10000, ethers.constants.AddressZero)
+    ).to.be.revertedWith('Wallet is zero')
     // Can't set too high fees
     await expect(
       marketplace.setTalentirFee(10001, talentirFeeReceiver.address)
@@ -498,7 +519,14 @@ describe('Marketplace Tests', function () {
     // Can still cancel orders
     transaction = marketplace.connect(user).cancelOrders([1, 2], false)
 
-    await expect(transaction).to.emit(marketplace, 'OrderCancelled')
+    await expect(transaction).to.emit(marketplace, 'OrderCancelled').withNamedArgs({
+      orderId: 1,
+      from: user.address,
+      tokenId,
+      side: SELL,
+      price: oneEther,
+      quantity: 1
+    })
 
     await expect(await transaction).to.changeEtherBalances(
       [marketplace, user],

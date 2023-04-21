@@ -58,7 +58,7 @@ contract ERC1155PullTransfer {
         address _from,
         address _to,
         uint256 _quantity
-    ) internal {
+    ) internal virtual {
         // First, transfer token into this contract
         bytes memory data;
         IERC1155(_tokenContract).safeTransferFrom(_from, address(this), _tokenId, _quantity, data);
