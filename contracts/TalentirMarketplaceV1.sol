@@ -5,7 +5,7 @@ pragma solidity 0.8.17;
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import {ERC1155Holder} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
+import {ERC1155Receiver} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Receiver.sol";
 
 /// LIBRARIES ///
 import {RBTLibrary} from "./utils/RBTLibrary.sol";
@@ -20,7 +20,7 @@ import {IERC2981} from "@openzeppelin/contracts/interfaces/IERC2981.sol";
 /// @title Talentir Marketplace Contract
 /// @author Christoph Siebenbrunner, Johannes Kares
 /// @custom:security-contact office@talentir.com
-contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Holder {
+contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Receiver {
     /// LIBRARIES ///
     using RBTLibrary for RBTLibrary.Tree;
     using LinkedListLibrary for LinkedListLibrary.LinkedList;
@@ -67,6 +67,7 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     address public talentirFeeWallet;
     uint256 public nextOrderId = 1;
     uint256 internal constant PERCENT = 100_000;
+    bool private isInSellOrder = false;
 
     /// EVENTS ///
     event OrderAdded(
@@ -353,7 +354,9 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     function _addOrder(uint256 _tokenId, Side _side, address _sender, uint256 _price, uint256 _quantity) internal {
         // Transfer tokens to this contract
         if (_side == Side.SELL) {
+            isInSellOrder = true;
             _safeTransferFrom(talentirNFT, _tokenId, _sender, address(this), _quantity);
+            isInSellOrder = false;
         }
         // Check if orders already exist at that price, otherwise add tree entry
         if (!markets[_tokenId][_side].priceTree.exists(_price)) {
@@ -403,5 +406,33 @@ contract TalentirMarketplaceV1 is Pausable, Ownable, ReentrancyGuard, ERC1155Hol
     ) internal {
         bytes memory data;
         IERC1155(_token).safeTransferFrom(_from, _to, _tokenId, _quantity, data);
+    }
+
+    /// OVERRIDE FUNCTIONS ///
+    /// ERC1155Receiver ///
+    function onERC1155Received(
+        address,
+        address,
+        uint256,
+        uint256,
+        bytes calldata
+    ) public virtual override returns (bytes4) {
+        require(msg.sender == talentirNFT, "Only Talentir Tokens");
+        require(isInSellOrder, "Only in sell order");
+
+        return this.onERC1155Received.selector;
+    }
+
+    function onERC1155BatchReceived(
+        address,
+        address,
+        uint256[] calldata,
+        uint256[] calldata,
+        bytes calldata
+    ) public virtual override returns (bytes4) {
+        require(msg.sender == talentirNFT, "Only Talentir Tokens");
+        require(isInSellOrder, "Only in sell order");
+
+        return this.onERC1155BatchReceived.selector;
     }
 }
