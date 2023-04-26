@@ -108,7 +108,7 @@ contract TalentirMarketplaceV1 is
     /// @dev tokenId => Side => OrderBook
     mapping(uint256 => mapping(Side => OrderBook)) private _markets;
 
-    /// @dev internal flag to enable receiving tokens
+    /// @dev private flag to enable receiving tokens
     bool private _contractCanReceiveToken = false;
 
     /// EVENTS ///
@@ -176,36 +176,36 @@ contract TalentirMarketplaceV1 is
     event TalentirFeeSet(uint256 fee, address indexed wallet);
 
     /// CONSTRUCTOR ///
-    constructor(address _talentirToken) ERC1155PullTransfer(_talentirToken) {
-        require(_talentirToken != address(0), "Invalid address");
-        require(IERC165(_talentirToken).supportsInterface(type(IERC2981).interfaceId), "Must implement IERC2981");
-        require(IERC165(_talentirToken).supportsInterface(type(IERC1155).interfaceId), "Must implement IERC1155");
-        talentirToken = _talentirToken;
+    constructor(address initialTalentirToken) ERC1155PullTransfer(initialTalentirToken) {
+        require(initialTalentirToken != address(0), "Invalid address");
+        require(IERC165(initialTalentirToken).supportsInterface(type(IERC2981).interfaceId), "Must implement IERC2981");
+        require(IERC165(initialTalentirToken).supportsInterface(type(IERC1155).interfaceId), "Must implement IERC1155");
+        talentirToken = initialTalentirToken;
     }
 
     /// PUBLIC FUNCTIONS ///
 
-    /// @notice Return the best `_side` (buy=0, sell=1) order for token `_tokenId`
-    /// @dev Return the best `_side` (buy=0, sell=1) order for token `_tokenId`
-    /// @param _tokenId token Id (ERC1155)
-    /// @param _side Side of order (buy=0, sell=1)
+    /// @notice Return the best `side` (buy=0, sell=1) order for token `tokenId`
+    /// @dev Return the best `side` (buy=0, sell=1) order for token `tokenId`
+    /// @param tokenId token Id (ERC1155)
+    /// @param side Side of order (buy=0, sell=1)
     /// @return orderId of best order
     /// @return price price of best order. This is the price for 100% of the quantity.
-    function getBestOrder(uint256 _tokenId, Side _side) public view returns (uint256 orderId, uint256 price) {
-        price = _side == Side.BUY
-            ? _markets[_tokenId][_side].priceTree.last()
-            : _markets[_tokenId][_side].priceTree.first();
+    function getBestOrder(uint256 tokenId, Side side) public view returns (uint256 orderId, uint256 price) {
+        price = side == Side.BUY
+            ? _markets[tokenId][side].priceTree.last()
+            : _markets[tokenId][side].priceTree.first();
 
-        (, uint256 bestOrderId, ) = _markets[_tokenId][_side].orderList[price].getNode(0);
+        (, uint256 bestOrderId, ) = _markets[tokenId][side].orderList[price].getNode(0);
         orderId = bestOrderId;
     }
 
-    /// @notice Computes the fee amount to be paid to Talentir for a transaction of size `_totalPaid`
-    /// @dev Computes the fee amount to be paid for a transaction of size `_totalPaid`.
-    /// @param _totalPaid price*volume
+    /// @notice Computes the fee amount to be paid to Talentir for a transaction of size `totalPaid`
+    /// @dev Computes the fee amount to be paid for a transaction of size `totalPaid`.
+    /// @param totalPaid price*volume
     /// @return uint256 fee
-    function calcTalentirFee(uint256 _totalPaid) public view returns (uint256) {
-        return (talentirFeePercent * _totalPaid) / ONE_HUNDRED_PERCENT;
+    function calcTalentirFee(uint256 totalPaid) public view returns (uint256) {
+        return (talentirFeePercent * totalPaid) / ONE_HUNDRED_PERCENT;
     }
 
     /// @notice Sell `tokenQuantity` of token `tokenId` for min `ethQuantity` total price. (ERC1155)
@@ -304,57 +304,57 @@ contract TalentirMarketplaceV1 is
     /// @dev Set the fee that Talentir will receive on each transaction.
     /// @dev emits DefaultFeeSet event.
     /// @dev fee capped at 10%
-    /// @param _fee fee percent (100% = 100 000)
-    /// @param _wallet address where Talentir fee will be sent to
-    function setTalentirFee(uint256 _fee, address _wallet) external onlyOwner {
-        require(_wallet != address(0), "Wallet is zero");
-        require(_fee <= ONE_HUNDRED_PERCENT / 10, "Must be <=10k"); // Talentir fee can never be higher than 10%
-        talentirFeePercent = _fee;
-        talentirFeeWallet = _wallet;
-        emit TalentirFeeSet(_fee, _wallet);
+    /// @param fee fee percent (100% = 100 000)
+    /// @param wallet address where Talentir fee will be sent to
+    function setTalentirFee(uint256 fee, address wallet) external onlyOwner {
+        require(wallet != address(0), "Wallet is zero");
+        require(fee <= ONE_HUNDRED_PERCENT / 10, "Must be <=10k"); // Talentir fee can never be higher than 10%
+        talentirFeePercent = fee;
+        talentirFeeWallet = wallet;
+        emit TalentirFeeSet(fee, wallet);
     }
 
-    /// INTERNAL FUNCTIONS ///
+    /// PRIVATE / INTERNAL FUNCTIONS ///
 
     /// @dev Return BUY for SELL or vice versa.
-    function _oppositeSide(Side _side) internal pure returns (Side) {
-        return (_side == Side.BUY) ? Side.SELL : Side.BUY;
+    function _oppositeSide(Side side) internal pure returns (Side) {
+        return (side == Side.BUY) ? Side.SELL : Side.BUY;
     }
 
     /// @dev Make a limit order. Internally, all orders are limit orders to prevent frontrunning.
     function _makeOrder(
-        address _sender,
-        uint256 _tokenId,
-        Side _side,
-        uint256 _ethQuantity,
-        uint256 _tokenQuantity,
-        bool _addOrderForRemaining,
-        bool _useAsyncTransfer
-    ) internal {
-        if (_side == Side.SELL) {
+        address sender,
+        uint256 tokenId,
+        Side side,
+        uint256 ethQuantity,
+        uint256 tokenQuantity,
+        bool addOrderForRemaining,
+        bool useAsyncTransfer
+    ) private {
+        if (side == Side.SELL) {
             require(
-                (_sender == msg.sender) || (IERC1155(talentirToken).isApprovedForAll(_sender, msg.sender)),
+                (sender == msg.sender) || (IERC1155(talentirToken).isApprovedForAll(sender, msg.sender)),
                 "Not allowed"
             );
         }
 
-        require(_ethQuantity > 0, "Price must be positive");
-        require(_tokenQuantity > 0, "Token quantity must be positive");
-        require(_tokenQuantity <= 1_000_000, "Token quantity too high");
+        require(ethQuantity > 0, "Price must be positive");
+        require(tokenQuantity > 0, "Token quantity must be positive");
+        require(tokenQuantity <= 1_000_000, "Token quantity too high");
 
-        uint256 price = (_ethQuantity * PRICE_FACTOR) / _tokenQuantity;
+        uint256 price = (ethQuantity * PRICE_FACTOR) / tokenQuantity;
         require(price > 0, "Rounding problem");
 
         uint256 ethQuantityExecuted;
-        Side oppositeSide = _oppositeSide(_side);
-        (uint256 bestOrderId, uint256 bestPrice) = getBestOrder(_tokenId, oppositeSide);
+        Side oppositeSide = _oppositeSide(side);
+        (uint256 bestOrderId, uint256 bestPrice) = getBestOrder(tokenId, oppositeSide);
 
         // If possible, buy up to the specified price limit
-        uint256 remainingQuantity = _tokenQuantity;
+        uint256 remainingQuantity = tokenQuantity;
 
         while (
             (remainingQuantity > 0) &&
-            ((_side == Side.BUY) ? price >= bestPrice : price <= bestPrice) &&
+            ((side == Side.BUY) ? price >= bestPrice : price <= bestPrice) &&
             (bestOrderId > 0)
         ) {
             uint256 quantityToBuy;
@@ -364,45 +364,45 @@ contract TalentirMarketplaceV1 is
                 quantityToBuy = orders[bestOrderId].quantity;
             }
 
-            ethQuantityExecuted = _executeOrder(_sender, bestOrderId, quantityToBuy, _useAsyncTransfer);
+            ethQuantityExecuted = _executeOrder(sender, bestOrderId, quantityToBuy, useAsyncTransfer);
             remainingQuantity -= quantityToBuy;
 
-            if ((_side == Side.BUY) && !(_addOrderForRemaining)) {
-                _ethQuantity -= ethQuantityExecuted;
+            if ((side == Side.BUY) && !(addOrderForRemaining)) {
+                ethQuantity -= ethQuantityExecuted;
             }
 
             if (remainingQuantity > 0) {
-                (bestOrderId, bestPrice) = getBestOrder(_tokenId, oppositeSide);
+                (bestOrderId, bestPrice) = getBestOrder(tokenId, oppositeSide);
             }
         }
         // If the order couldn't be filled, add the remaining quantity to buy orders
-        if (_addOrderForRemaining && (remainingQuantity > 0)) {
-            _addOrder(_tokenId, _side, _sender, price, remainingQuantity);
+        if (addOrderForRemaining && (remainingQuantity > 0)) {
+            _addOrder(tokenId, side, sender, price, remainingQuantity);
         }
 
         // Refund any remaining ETH from a buy order not added to order book
-        if ((_side == Side.BUY) && !(_addOrderForRemaining)) {
-            require(msg.value >= _ethQuantity, "Couldn't refund"); // just to be safe - don't refund more than what was sent
+        if ((side == Side.BUY) && !(addOrderForRemaining)) {
+            require(msg.value >= ethQuantity, "Couldn't refund"); // just to be safe - don't refund more than what was sent
 
             // Safe to directly send ETH. In the worst case the transaction just doesn't go through.
-            _ethTransfer(_sender, _ethQuantity);
+            _ethTransfer(sender, ethQuantity);
         }
     }
 
     /// @dev Executes one atomic order (transfers tokens and removes order).
     function _executeOrder(
-        address _sender,
-        uint256 _orderId,
-        uint256 _quantity,
-        bool _useAsyncTransfer
-    ) internal returns (uint256 ethQuantity) {
+        address sender,
+        uint256 orderId,
+        uint256 quantity,
+        bool useAsyncTransfer
+    ) private returns (uint256 ethQuantity) {
         // This is an optimization to avoid the famous "stack to deep" error.
         OrderExecutedLocals memory locals;
-        Order memory order = orders[_orderId];
+        Order memory order = orders[orderId];
 
-        locals.quantity = _quantity;
-        locals.useAsyncTransfer = _useAsyncTransfer;
-        locals.cost = (order.price * _quantity) / PRICE_FACTOR;
+        locals.quantity = quantity;
+        locals.useAsyncTransfer = useAsyncTransfer;
+        locals.cost = (order.price * quantity) / PRICE_FACTOR;
 
         (locals.royaltiesReceiver, locals.royalties) = IERC2981(talentirToken).royaltyInfo(order.tokenId, locals.cost);
 
@@ -410,34 +410,34 @@ contract TalentirMarketplaceV1 is
 
         require(locals.cost > (locals.royalties + locals.talentirFee), "Problem calculating fees");
 
-        if (_quantity == order.quantity) {
-            _removeOrder(_orderId);
+        if (quantity == order.quantity) {
+            _removeOrder(orderId);
         } else {
-            orders[_orderId].quantity -= _quantity;
-            locals.remainingQuantity = orders[_orderId].quantity;
+            orders[orderId].quantity -= quantity;
+            locals.remainingQuantity = orders[orderId].quantity;
         }
 
         if (order.side == Side.BUY) {
             // Caller is the seller
-            locals.seller = _sender;
+            locals.seller = sender;
             locals.buyer = order.sender;
-            locals.tokenSender = _sender;
+            locals.tokenSender = sender;
         } else {
             // Caller is the buyer
             locals.seller = order.sender;
-            locals.buyer = _sender;
+            locals.buyer = sender;
             locals.tokenSender = address(this);
         }
 
         locals.payToSeller = locals.cost - locals.royalties - locals.talentirFee;
 
-        if (_useAsyncTransfer) {
-            _asyncTokenTransferFrom(order.tokenId, locals.tokenSender, locals.buyer, _quantity);
+        if (useAsyncTransfer) {
+            _asyncTokenTransferFrom(order.tokenId, locals.tokenSender, locals.buyer, quantity);
             _asyncTransfer(locals.seller, locals.payToSeller);
             _asyncTransfer(locals.royaltiesReceiver, locals.royalties);
             _asyncTransfer(talentirFeeWallet, locals.talentirFee);
         } else {
-            _tokenTransferFrom(order.tokenId, locals.tokenSender, locals.buyer, _quantity);
+            _tokenTransferFrom(order.tokenId, locals.tokenSender, locals.buyer, quantity);
             _ethTransfer(locals.seller, locals.payToSeller);
             _ethTransfer(locals.royaltiesReceiver, locals.royalties);
             _ethTransfer(talentirFeeWallet, locals.talentirFee);
@@ -449,7 +449,7 @@ contract TalentirMarketplaceV1 is
     }
 
     /// @dev This function exists to use less local variables and avoid the "stack to deep" error.
-    function _emitOrderExecutedEvent(OrderExecutedLocals memory locals, Order memory order) internal {
+    function _emitOrderExecutedEvent(OrderExecutedLocals memory locals, Order memory order) private {
         emit OrderExecuted(
             order.orderId,
             locals.buyer,
@@ -465,31 +465,31 @@ contract TalentirMarketplaceV1 is
     }
 
     /// @dev Add order to all data structures.
-    function _addOrder(uint256 _tokenId, Side _side, address _sender, uint256 _price, uint256 _quantity) internal {
+    function _addOrder(uint256 tokenId, Side side, address sender, uint256 price, uint256 quantity) private {
         // Transfer tokens to this contract
-        if (_side == Side.SELL) {
-            _tokenTransferFrom(_tokenId, _sender, address(this), _quantity);
+        if (side == Side.SELL) {
+            _tokenTransferFrom(tokenId, sender, address(this), quantity);
         }
 
         // Check if orders already exist at that price, otherwise add tree entry
-        if (!_markets[_tokenId][_side].priceTree.exists(_price)) {
-            _markets[_tokenId][_side].priceTree.insert(_price);
+        if (!_markets[tokenId][side].priceTree.exists(price)) {
+            _markets[tokenId][side].priceTree.insert(price);
         }
 
-        // Add order to FIFO linked list at _price
-        _markets[_tokenId][_side].orderList[_price].push(nextOrderId, true);
+        // Add order to FIFO linked list at price
+        _markets[tokenId][side].orderList[price].push(nextOrderId, true);
 
         // add order to order mapping
         orders[nextOrderId] = Order({
             orderId: nextOrderId,
-            side: _side,
-            tokenId: _tokenId,
-            sender: _sender,
-            price: _price,
-            quantity: _quantity
+            side: side,
+            tokenId: tokenId,
+            sender: sender,
+            price: price,
+            quantity: quantity
         });
 
-        emit OrderAdded(nextOrderId, _sender, _tokenId, _side, _price, _quantity);
+        emit OrderAdded(nextOrderId, sender, tokenId, side, price, quantity);
 
         unchecked {
             nextOrderId++;
@@ -497,10 +497,10 @@ contract TalentirMarketplaceV1 is
     }
 
     /// @dev Remove order from all data structures..
-    function _removeOrder(uint256 _orderId) internal {
-        uint256 price = orders[_orderId].price;
-        uint256 tokenId = orders[_orderId].tokenId;
-        Side side = orders[_orderId].side;
+    function _removeOrder(uint256 orderId) private {
+        uint256 price = orders[orderId].price;
+        uint256 tokenId = orders[orderId].tokenId;
+        Side side = orders[orderId].side;
 
         // remove order from linked list
         _markets[tokenId][side].orderList[price].pop(false);
@@ -511,14 +511,14 @@ contract TalentirMarketplaceV1 is
         }
 
         // remove from order mapping
-        delete (orders[_orderId]);
+        delete (orders[orderId]);
     }
 
     /// @dev Calls safeTransferFrom (ERC1155)
-    function _tokenTransferFrom(uint256 _tokenId, address _from, address _to, uint256 _quantity) internal {
+    function _tokenTransferFrom(uint256 tokenId, address from, address to, uint256 quantity) private {
         _contractCanReceiveToken = true;
         bytes memory data;
-        IERC1155(talentirToken).safeTransferFrom(_from, _to, _tokenId, _quantity, data);
+        IERC1155(talentirToken).safeTransferFrom(from, to, tokenId, quantity, data);
         _contractCanReceiveToken = false;
     }
 

@@ -32,35 +32,35 @@ contract ERC1155PullTransfer {
     }
 
     /// @notice Function to withdraw tokens from this contract. Notice that ANY user can call this function
-    /// @param _user The address of the user
-    /// @param _tokenId The ID of the token
-    function withdrawTokens(address _user, uint256 _tokenId) external {
-        uint256 balance = userTokenEscrow[_user][_tokenId];
+    /// @param user The address of the user
+    /// @param tokenId The ID of the token
+    function withdrawTokens(address user, uint256 tokenId) external {
+        uint256 balance = userTokenEscrow[user][tokenId];
         require(balance > 0, "No tokens to withdraw");
 
         // Remove balance from escrow
-        userTokenEscrow[_user][_tokenId] = 0;
+        userTokenEscrow[user][tokenId] = 0;
 
         // Transfer token to user
         bytes memory data;
-        _tokenContract.safeTransferFrom(address(this), _user, _tokenId, balance, data);
+        _tokenContract.safeTransferFrom(address(this), user, tokenId, balance, data);
 
-        emit ERC1155Withdrawn(_user, _tokenId, balance);
+        emit ERC1155Withdrawn(user, tokenId, balance);
     }
 
     /// @notice Internal function to transfer tokens from a user to this contract
-    /// @param _tokenId The ID of the token
-    /// @param _from The address of the user
-    /// @param _to The address of the recipient
-    /// @param _quantity The quantity of the token
-    function _asyncTokenTransferFrom(uint256 _tokenId, address _from, address _to, uint256 _quantity) internal virtual {
+    /// @param tokenId The ID of the token
+    /// @param from The address of the user
+    /// @param to The address of the recipient
+    /// @param quantity The quantity of the token
+    function _asyncTokenTransferFrom(uint256 tokenId, address from, address to, uint256 quantity) internal virtual {
         // First, transfer token into this contract
         bytes memory data;
-        _tokenContract.safeTransferFrom(_from, address(this), _tokenId, _quantity, data);
+        _tokenContract.safeTransferFrom(from, address(this), tokenId, quantity, data);
 
         // Make them available for withdrawal
-        userTokenEscrow[_to][_tokenId] += _quantity;
+        userTokenEscrow[to][tokenId] += quantity;
 
-        emit ERC1155Deposited(_to, _tokenId, _quantity);
+        emit ERC1155Deposited(to, tokenId, quantity);
     }
 }
