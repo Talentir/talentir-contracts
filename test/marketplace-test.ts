@@ -38,7 +38,7 @@ describe('Talentir Marketplace Tests', function () {
     // Can't mint token before minter role is set
     await expect(
       talentirNFT.mint(seller.address, 'abc', 'abc', royaltyReceiver.address, false)
-    ).to.be.revertedWith('Not allowed')
+    ).to.be.revertedWith('Not minter')
     // Set minter role to owner
     await talentirNFT.setMinterRole(owner.address, [])
   })
