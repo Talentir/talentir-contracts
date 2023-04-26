@@ -13,42 +13,75 @@ import {DefaultOperatorFilterer} from "operator-filter-registry/src/DefaultOpera
 /// @custom:security-contact office@talentir.com
 contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFilterer, Ownable, Pausable {
     /// MEMBERS ///
-    mapping(uint256 => string) private _tokenCIDs; // storing the IPFS CIDs
-    mapping(string => bool) internal _cids;
-    address private _approvedMarketplace;
-    address private _minterAddress;
-    uint256 public constant TOKEN_FRACTIONS = 1_000_000;
+
+    /// @notice tokenID => IPFS CID. Storing the IPFS CIDs
+    mapping(uint256 => string) public tokenCIDs;
+
+    /// @notice IPFS CID => exists. To check if a CID is already in use
+    mapping(string => bool) public cids;
+
+    /// @notice The address of the marketplace contract
+    address public approvedMarketplace;
+
+    /// @notice The address of the minter
+    address public minterAddress;
+
+    /// @notice tokenID => isOnPresale (true/false)
     mapping(uint256 => bool) public isOnPresale;
-    mapping(address => bool) internal hasGlobalPresaleAllowance;
-    mapping(address => mapping(uint256 => bool)) internal hasTokenPresaleAllowance;
+
+    /// @notice wallet => isOnGlobalPresale (true/false)
+    mapping(address => bool) public hasGlobalPresaleAllowance;
+
+    /// @notice wallet => tokenID => isOnTokenPresale (true/false)
+    mapping(address => mapping(uint256 => bool)) public hasTokenPresaleAllowance;
+
+    /// @notice The total amount of tokens per token ID
+    uint256 public constant TOKEN_FRACTIONS = 1_000_000;
 
     /// EVENTS ///
-    event MarketplaceApproved(address marketplaceAddress, bool approved);
+
+    /// @notice Emitted when the royalty percentage is changed
+    /// @param percent The new royalty percentage. 100% = 100 000
     event RoyaltyPercentageChanged(uint256 percent);
-    event TalentChanged(address from, address to, uint256 tokenID);
-    event MinterRoleChanged(address from, address to);
-    event MarketplaceChanged(address from, address to);
-    event GlobalPresaleAllowanceSet(address user, bool allowance);
-    event TokenPresaleAllowanceSet(address user, uint256 id, bool allowance);
-    event PresaleEnded(uint256 tokenId);
 
-    /// MODIFIERS ///
-    modifier onlyMinter() {
-        require(_msgSender() == _minterAddress, "Not allowed");
-        _;
-    }
+    /// @notice Emitted when the talent is updated for a token
+    /// @param from The old talent address
+    /// @param to The new talent address
+    /// @param tokenID The token ID
+    event TalentChanged(address indexed from, address indexed to, uint256 indexed tokenID);
 
-    modifier onlyNoPresaleOrAllowed(address sender, uint256 tokenId) {
-        require(_hasNoPresaleOrAllowed(sender, tokenId), "Not allowed in presale");
-        _;
-    }
+    /// @notice Emitted when the minter role has changed
+    /// @param from The old minter address
+    /// @param to The new minter address
+    event MinterRoleChanged(address indexed from, address indexed to);
+
+    /// @notice Emitted when the marketplace address has changed
+    /// @param from The old marketplace address
+    /// @param to The new marketplace address
+    event MarketplaceChanged(address indexed from, address indexed to);
+
+    /// @notice Emitted when the global presale allowance for a user is changed
+    /// @param user The user address
+    /// @param allowance The new allowance
+    event GlobalPresaleAllowanceSet(address indexed user, bool allowance);
+
+    /// @notice Emitted when the token presale allowance for a user is changed
+    /// @param user The user address
+    /// @param id The token ID
+    /// @param allowance The new allowance
+    event TokenPresaleAllowanceSet(address indexed user, uint256 indexed id, bool allowance);
+
+    /// @notice Emitted when the presale for a token has ended
+    /// @param tokenId The token ID
+    event PresaleEnded(uint256 indexed tokenId);
 
     /// PUBLIC FUNCTIONS ///
 
+    /// @notice Returns the URI for a given token ID.
     /// @param tokenId The token ID to return the URI for.
     /// @return The token URI for the given token ID.
     function uri(uint256 tokenId) public view override returns (string memory) {
-        return string(abi.encodePacked("ipfs://", _tokenCIDs[tokenId]));
+        return string(abi.encodePacked("ipfs://", tokenCIDs[tokenId]));
     }
 
     /// @notice A pure function to calculate the tokenID from a given unique contentID. A contentID
@@ -58,26 +91,14 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
         return uint256(keccak256(abi.encodePacked((contentID))));
     }
 
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public view virtual override(ERC1155, TalentirERC2981) returns (bool) {
-        return super.supportsInterface(interfaceId);
-    }
-
     /// @notice Update the talent address for a given token. This can only be called by the current
     /// talent address.
     /// @param tokenId The token ID to update the talent for.
     /// @param talent The address to receive the trading royalty for the token.
-    function updateTalent(uint256 tokenId, address talent) public {
-        address currentTalent = _talents[tokenId];
+    function updateTalent(uint256 tokenId, address talent) external {
+        address currentTalent = talents[tokenId];
         require(currentTalent == msg.sender, "Talent must update");
         _setTalent(tokenId, talent);
-    }
-
-    /// @param tokenId The token ID to get the talent address for.
-    /// @return The address of the talent for the given token.
-    function getTalent(uint256 tokenId) public view returns (address) {
-        return _talents[tokenId];
     }
 
     /// MINTER FUNCTIONS ///
@@ -97,33 +118,33 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
         string memory contentID,
         address talent,
         bool mintWithPresale
-    ) public onlyMinter whenNotPaused {
+    ) external onlyMinter whenNotPaused {
         require(bytes(cid).length > 0, "cid is empty");
         require(bytes(contentID).length > 0, "contentID is empty");
-        require(_cids[cid] == false, "Token CID already used");
+        require(cids[cid] == false, "Token CID already used");
         uint256 tokenId = contentIdToTokenId(contentID);
-        require(bytes(_tokenCIDs[tokenId]).length == 0, "Token already minted");
+        require(bytes(tokenCIDs[tokenId]).length == 0, "Token already minted");
         isOnPresale[tokenId] = mintWithPresale;
-        _cids[cid] = true;
-        _tokenCIDs[tokenId] = cid;
+        cids[cid] = true;
+        tokenCIDs[tokenId] = cid;
         _setTalent(tokenId, talent);
         _mint(to, tokenId, TOKEN_FRACTIONS, "");
 
         // Pre-approve marketplace contract (can be revoked by talent)
         // This is necessary, so the market place can move the tokens on behalf of the user when posting
         // the first sell order.
-        _setApprovalForAll(to, _approvedMarketplace, true);
+        _setApprovalForAll(to, approvedMarketplace, true);
 
         // Pre-approve minter role, so first sell order can automatically be executed at the end
         // of the countdown (can be revoked by talent)
-        _setApprovalForAll(to, _minterAddress, true);
+        _setApprovalForAll(to, minterAddress, true);
     }
 
     /// @notice Set the global presale allowance for a user. This allows the user to buy
     /// any token on presale.
     /// @param user The user to set the allowance for.
     /// @param allowance The allowance to set.
-    function setGlobalPresaleAllowance(address user, bool allowance) public onlyMinter {
+    function setGlobalPresaleAllowance(address user, bool allowance) external onlyMinter {
         require(user != address(0), "User is zero");
         require(hasGlobalPresaleAllowance[user] != allowance, "Already set");
         hasGlobalPresaleAllowance[user] = allowance;
@@ -135,9 +156,9 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     /// @param user The user to set the allowance for.
     /// @param tokenId The token to set the allowance for.
     /// @param allowance The allowance to set.
-    function setTokenPresaleAllowance(address user, uint256 tokenId, bool allowance) public onlyMinter {
+    function setTokenPresaleAllowance(address user, uint256 tokenId, bool allowance) external onlyMinter {
         require(user != address(0), "User is zero");
-        require(_talents[tokenId] != address(0), "tokenId not found");
+        require(talents[tokenId] != address(0), "tokenId not found");
         require(hasTokenPresaleAllowance[user][tokenId] != allowance, "Already set");
         hasTokenPresaleAllowance[user][tokenId] = allowance;
         emit TokenPresaleAllowanceSet(user, tokenId, allowance);
@@ -146,7 +167,7 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     /// @notice End the presale for a token, so token can be transferred to anyone, presale can't be
     /// turned back on for the token
     /// @param tokenId The token to end the presale for.
-    function endPresale(uint256 tokenId) public onlyMinter {
+    function endPresale(uint256 tokenId) external onlyMinter {
         require(isOnPresale[tokenId], "Already ended");
         isOnPresale[tokenId] = false;
         emit PresaleEnded(tokenId);
@@ -168,59 +189,58 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
 
     /// @notice Set the royalty percentage for all tokens.
     /// @param percent The new royalty percentage. 1% = 1000.
-    function setRoyalty(uint256 percent) public onlyOwner {
-        require(percent <= 10_000, "Must be <= 10%");
-        _royaltyPercent = percent;
+    function setRoyalty(uint256 percent) external onlyOwner {
+        require(percent <= ONE_HUNDRED_PERCENT / 10, "Must be <= 10%");
+        royaltyPercent = percent;
         emit RoyaltyPercentageChanged(percent);
     }
 
     /// @notice Set the minter address.
-    /// @param minterAddress The new minter address.
+    /// @param newMinterAddress The new minter address.
     /// @param approvedUsers Users who have the old minter address approved. Approval will be removed.
-    function setMinterRole(address minterAddress, address[] memory approvedUsers) public onlyOwner {
-        require(minterAddress != address(0), "Minter is zero");
+    function setMinterRole(address newMinterAddress, address[] memory approvedUsers) external onlyOwner {
+        require(newMinterAddress != address(0), "Minter is zero");
 
         for (uint i = 0; i < approvedUsers.length; i++) {
-            _setApprovalForAll(approvedUsers[i], _minterAddress, false);
+            _setApprovalForAll(approvedUsers[i], newMinterAddress, false);
         }
 
-        address from = _minterAddress;
-        _minterAddress = minterAddress;
-        emit MinterRoleChanged(from, minterAddress);
+        address from = minterAddress;
+        minterAddress = newMinterAddress;
+        emit MinterRoleChanged(from, newMinterAddress);
     }
 
     /// @notice Set the marketplace address.
-    /// @param marketplace The new marketplace address.
+    /// @param netMarketplace The new marketplace address.
     /// @param approvedUsers Users who have the old marketplace approved. Approval will be removed.
-    function setMarketplace(address marketplace, address[] memory approvedUsers) public onlyOwner {
-        require(marketplace != address(0), "Marketplace is zero");
+    function setMarketplace(address netMarketplace, address[] memory approvedUsers) external onlyOwner {
+        require(netMarketplace != address(0), "Marketplace is zero");
 
         for (uint i = 0; i < approvedUsers.length; i++) {
-            _setApprovalForAll(approvedUsers[i], _approvedMarketplace, false);
+            _setApprovalForAll(approvedUsers[i], netMarketplace, false);
         }
 
-        address from = _approvedMarketplace;
-        _approvedMarketplace = marketplace;
-        emit MarketplaceChanged(from, marketplace);
+        address from = approvedMarketplace;
+        approvedMarketplace = netMarketplace;
+        emit MarketplaceChanged(from, netMarketplace);
     }
 
     /// ONLY OPERATOR FUNCTIONS ///
-    /// Functions to implement OpenSea's DefaultOperatorFilterer
+    /// Functions to implement the DefaultOperatorFilterer
 
-    function setApprovalForAll(
-        address operator,
-        bool approved
-    ) public override whenNotPaused onlyAllowedOperatorApproval(operator) {
-        super.setApprovalForAll(operator, approved);
-    }
-
+    /// @notice Allows to batch transfer to many addresses.
+    /// @param from The address to transfer from.
+    /// @param to The addresses to transfer to.
+    /// @param id The token id to transfer.
+    /// @param amounts The amounts to transfer.
+    /// @param data Additional data.
     function batchTransfer(
         address from,
         address[] memory to,
         uint256 id,
         uint256[] memory amounts,
         bytes memory data
-    ) public onlyAllowedOperator(from) whenNotPaused onlyNoPresaleOrAllowed(from, id) {
+    ) external onlyAllowedOperator(from) whenNotPaused onlyNoPresaleOrAllowed(from, id) {
         require(from == _msgSender() || isApprovedForAll(from, _msgSender()), "Caller is not token owner or approved");
         require(to.length == amounts.length, "Invalid array length");
 
@@ -229,6 +249,15 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
         }
     }
 
+    /// @inheritdoc ERC1155
+    function setApprovalForAll(
+        address operator,
+        bool approved
+    ) public override whenNotPaused onlyAllowedOperatorApproval(operator) {
+        super.setApprovalForAll(operator, approved);
+    }
+
+    /// @inheritdoc ERC1155
     function safeTransferFrom(
         address from,
         address to,
@@ -239,6 +268,7 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
         super.safeTransferFrom(from, to, tokenId, amount, data);
     }
 
+    /// @inheritdoc ERC1155
     function safeBatchTransferFrom(
         address from,
         address to,
@@ -252,14 +282,30 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
         super.safeBatchTransferFrom(from, to, ids, amounts, data);
     }
 
+    /// MODIFIERS ///
+
+    /// @dev Throws if called by any account other than the minter.
+    modifier onlyMinter() {
+        require(_msgSender() == minterAddress, "Not minter");
+        _;
+    }
+
+    /// @dev Throws if called by any account other than the marketplace.
+    modifier onlyNoPresaleOrAllowed(address sender, uint256 tokenId) {
+        require(_hasNoPresaleOrAllowed(sender, tokenId), "Not allowed in presale");
+        _;
+    }
+
     /// INTERNAL FUNCTIONS ///
+    /// @dev Set the talent for a token.
     function _setTalent(uint256 tokenID, address talent) internal {
         require(talent != address(0), "Talent is zero");
-        address from = _talents[tokenID];
-        _talents[tokenID] = talent;
+        address from = talents[tokenID];
+        talents[tokenID] = talent;
         emit TalentChanged(from, talent, tokenID);
     }
 
+    /// @dev Check if token is not on presale or sender is allowed to transfer.
     function _hasNoPresaleOrAllowed(address sender, uint256 tokenId) internal view returns (bool) {
         if (!isOnPresale[tokenId]) {
             return true;
@@ -274,5 +320,12 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
         }
 
         return false;
+    }
+
+    /// @inheritdoc ERC1155
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view virtual override(ERC1155, TalentirERC2981) returns (bool) {
+        return super.supportsInterface(interfaceId);
     }
 }

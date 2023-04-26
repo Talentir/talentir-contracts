@@ -44,7 +44,7 @@ describe('Talentir Token Tests', function () {
 
     await expect(
       talentir.mint(luki.address, cid1, contentID1, luki.address, false)
-    ).to.be.revertedWith('Not allowed')
+    ).to.be.revertedWith('Not minter')
 
     await expect(
       talentir.setMinterRole(ethers.constants.AddressZero, [])
@@ -237,7 +237,7 @@ describe('Talentir Token Tests', function () {
       .to.emit(talentir, 'TalentChanged')
       .withArgs(johnny.address, luki.address, tokenID1)
 
-    const talent = await talentir.getTalent(tokenID1)
+    const talent = await talentir.talents(tokenID1)
     expect(talent).to.equal(luki.address)
   })
 
@@ -422,7 +422,7 @@ describe('Talentir Token Tests', function () {
     await expect(
       talentir
         .mint(luki.address, cid1, contentID1, luki.address, true)
-    ).to.be.revertedWith('Not allowed')
+    ).to.be.revertedWith('Not minter')
 
     await expect(
       talentir
@@ -465,7 +465,7 @@ describe('Talentir Token Tests', function () {
       talentir
         .connect(luki)
         .setGlobalPresaleAllowance(luki.address, true)
-    ).to.be.revertedWith('Not allowed')
+    ).to.be.revertedWith('Not minter')
 
     await expect(
       talentir
@@ -534,7 +534,7 @@ describe('Talentir Token Tests', function () {
       talentir
         .connect(luki)
         .setTokenPresaleAllowance(luki.address, tokenID1, true)
-    ).to.be.revertedWith('Not allowed')
+    ).to.be.revertedWith('Not minter')
 
     await expect(
       talentir
@@ -602,7 +602,7 @@ describe('Talentir Token Tests', function () {
     await expect(
       talentir
         .endPresale(tokenID1)
-    ).to.be.revertedWith('Not allowed')
+    ).to.be.revertedWith('Not minter')
 
     await expect(
       talentir

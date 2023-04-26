@@ -38,7 +38,7 @@ describe('Talentir Marketplace Tests', function () {
     // Can't mint token before minter role is set
     await expect(
       talentirNFT.mint(seller.address, 'abc', 'abc', royaltyReceiver.address, false)
-    ).to.be.revertedWith('Not allowed')
+    ).to.be.revertedWith('Not minter')
     // Set minter role to owner
     await talentirNFT.setMinterRole(owner.address, [])
   })
@@ -817,7 +817,7 @@ describe('Talentir Marketplace Tests', function () {
           tokenId,
           side: 1,
           price: oneEther.mul(await marketplace.PRICE_FACTOR()).div(1_000),
-          quantity,
+          quantity: remainingQuantity,
           asyncTransfer: true
         })
 
@@ -901,6 +901,7 @@ describe('Talentir Marketplace Tests', function () {
     )
 
     const tokenId = await talentirNFT.contentIdToTokenId('abc')
+    const PRICE_FACTOR = await marketplace.PRICE_FACTOR()
 
     // Order with ID 1 created
     await expect(
@@ -908,7 +909,7 @@ describe('Talentir Marketplace Tests', function () {
         .connect(seller)
         .makeSellOrder(seller.address, tokenId, oneEther, 1, true, false)
     ).to.emit(marketplace, 'OrderAdded')
-      .withArgs(1, seller.address, tokenId, SELL, oneEther, 1)
+      .withArgs(1, seller.address, tokenId, SELL, oneEther.mul(PRICE_FACTOR), 1)
 
     // Order with ID 2 created
     await expect(
@@ -916,15 +917,15 @@ describe('Talentir Marketplace Tests', function () {
         .connect(seller)
         .makeSellOrder(seller.address, tokenId, oneEther, 1, true, false)
     ).to.emit(marketplace, 'OrderAdded')
-      .withArgs(2, seller.address, tokenId, SELL, oneEther, 1)
+      .withArgs(2, seller.address, tokenId, SELL, oneEther.mul(PRICE_FACTOR), 1)
 
-    // Order with ID 3 created
+    // // Order with ID 3 created
     await expect(
       marketplace
         .connect(seller)
         .makeSellOrder(seller.address, tokenId, oneEther, 1, true, false)
     ).to.emit(marketplace, 'OrderAdded')
-      .withArgs(3, seller.address, tokenId, SELL, oneEther, 1)
+      .withArgs(3, seller.address, tokenId, SELL, oneEther.mul(PRICE_FACTOR), 1)
 
     // Order ID 1 is the best order (posted first)
     const [orderId1] = await marketplace.getBestOrder(tokenId, 1)
