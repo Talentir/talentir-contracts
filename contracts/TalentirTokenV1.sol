@@ -14,7 +14,7 @@ import {DefaultOperatorFilterer} from "operator-filter-registry/src/DefaultOpera
 contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFilterer, Ownable, Pausable {
     /// MEMBERS ///
 
-    /// @notice tokenID => IPFS CID. Storing the IPFS CIDs
+    /// @notice tokenId => IPFS CID. Storing the IPFS CIDs
     mapping(uint256 => string) public tokenCIDs;
 
     /// @notice IPFS CID => exists. To check if a CID is already in use
@@ -26,13 +26,13 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     /// @notice The address of the minter
     address public minterAddress;
 
-    /// @notice tokenID => isOnPresale (true/false)
+    /// @notice tokenId => isOnPresale (true/false)
     mapping(uint256 => bool) public isOnPresale;
 
     /// @notice wallet => isOnGlobalPresale (true/false)
     mapping(address => bool) public hasGlobalPresaleAllowance;
 
-    /// @notice wallet => tokenID => isOnTokenPresale (true/false)
+    /// @notice wallet => tokenId => isOnTokenPresale (true/false)
     mapping(address => mapping(uint256 => bool)) public hasTokenPresaleAllowance;
 
     /// @notice The total amount of tokens per token ID
@@ -47,8 +47,8 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     /// @notice Emitted when the talent is updated for a token
     /// @param from The old talent address
     /// @param to The new talent address
-    /// @param tokenID The token ID
-    event TalentChanged(address indexed from, address indexed to, uint256 indexed tokenID);
+    /// @param tokenId The token ID
+    event TalentChanged(address indexed from, address indexed to, uint256 indexed tokenId);
 
     /// @notice Emitted when the minter role has changed
     /// @param from The old minter address
@@ -84,11 +84,11 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
         return string(abi.encodePacked("ipfs://", tokenCIDs[tokenId]));
     }
 
-    /// @notice A pure function to calculate the tokenID from a given unique contentID. A contentID
-    /// @param contentID Must be a unique identifier of the original content (such as a Youtube video ID)
+    /// @notice A pure function to calculate the tokenId from a given unique contentID. A contentID
+    /// @param contentId Must be a unique identifier of the original content (such as a Youtube video ID)
     /// @return The token ID for the given content ID.
-    function contentIdToTokenId(string memory contentID) public pure returns (uint256) {
-        return uint256(keccak256(abi.encodePacked((contentID))));
+    function contentIdToTokenId(string memory contentId) public pure returns (uint256) {
+        return uint256(keccak256(abi.encodePacked((contentId))));
     }
 
     /// @notice Update the talent address for a given token. This can only be called by the current
@@ -108,21 +108,21 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     /// minted.
     /// @param to The address to mint the token to.
     /// @param cid IPFS CID of the content
-    /// @param contentID unique content ID, such as unique Youtube ID
+    /// @param contentId unique content ID, such as unique Youtube ID
     /// @param talent The address to receive the trading royalty for the token.
     /// @param mintWithPresale Safely mint a new token with Presale. During presale, the Talentir can
     /// add addresses to the presale.
     function mint(
         address to,
         string memory cid,
-        string memory contentID,
+        string memory contentId,
         address talent,
         bool mintWithPresale
     ) external onlyMinter whenNotPaused {
         require(bytes(cid).length > 0, "cid is empty");
-        require(bytes(contentID).length > 0, "contentID is empty");
+        require(bytes(contentId).length > 0, "contentId is empty");
         require(cids[cid] == false, "Token CID already used");
-        uint256 tokenId = contentIdToTokenId(contentID);
+        uint256 tokenId = contentIdToTokenId(contentId);
         require(bytes(tokenCIDs[tokenId]).length == 0, "Token already minted");
         isOnPresale[tokenId] = mintWithPresale;
         cids[cid] = true;
@@ -298,11 +298,11 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
 
     /// INTERNAL FUNCTIONS ///
     /// @dev Set the talent for a token.
-    function _setTalent(uint256 tokenID, address talent) internal {
+    function _setTalent(uint256 tokenId, address talent) internal {
         require(talent != address(0), "Talent is zero");
-        address from = talents[tokenID];
-        talents[tokenID] = talent;
-        emit TalentChanged(from, talent, tokenID);
+        address from = talents[tokenId];
+        talents[tokenId] = talent;
+        emit TalentChanged(from, talent, tokenId);
     }
 
     /// @dev Check if token is not on presale or sender is allowed to transfer.

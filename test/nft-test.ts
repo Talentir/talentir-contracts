@@ -75,7 +75,7 @@ describe('Talentir Token Tests', function () {
       talentir
         .connect(minter)
         .mint(luki.address, cid1, '', luki.address, false)
-    ).to.be.revertedWith('contentID is empty')
+    ).to.be.revertedWith('contentId is empty')
 
     await expect(
       talentir
