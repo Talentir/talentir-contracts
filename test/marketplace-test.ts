@@ -3,6 +3,7 @@ import { expect } from 'chai'
 import { ethers } from 'hardhat'
 // eslint-disable-next-line
 import { TalentirTokenV1, TalentirMarketplaceV1 } from "../typechain-types";
+import { BigNumber } from 'ethers'
 
 describe('Talentir Marketplace Tests', function () {
   let talentirNFT: TalentirTokenV1
@@ -142,12 +143,6 @@ describe('Talentir Marketplace Tests', function () {
         .connect(buyer)
         .makeBuyOrder(buyer.address, tokenId, 0, false, false, { value: 0 })
     ).to.be.revertedWith('Price must be positive')
-    // Can't add order with rounding problem
-    await expect(
-      marketplace
-        .connect(seller)
-        .makeSellOrder(seller.address, tokenId, 1, 2, true, false)
-    ).to.be.revertedWith('Rounding problem')
     // Add order to orderbook
     await expect(
       marketplace
@@ -157,11 +152,11 @@ describe('Talentir Marketplace Tests', function () {
     let orderID = await marketplace.getBestOrder(tokenId, SELL)
     let order = await marketplace.orders(orderID[0])
     expect(orderID[0]).to.equal(1)
-    expect(orderID[1]).to.equal(oneEther)
+    expect(orderID[1]).to.equal(oneEther.mul(await marketplace.PRICE_FACTOR()))
     expect(order.tokenId).to.equal(tokenId)
     expect(order.side).to.equal(SELL)
     expect(order.sender).to.equal(seller.address)
-    expect(order.price).to.equal(oneEther)
+    expect(order.price).to.equal(oneEther.mul(await marketplace.PRICE_FACTOR()))
     expect(order.quantity).to.equal(1)
     // Balances are updated
     expect(await talentirNFT.balanceOf(seller.address, tokenId)).to.equal(
@@ -194,11 +189,11 @@ describe('Talentir Marketplace Tests', function () {
     orderID = await marketplace.getBestOrder(tokenId, BUY)
     order = await marketplace.orders(orderID[0])
     expect(orderID[0]).to.equal(2)
-    expect(orderID[1]).to.equal(1000)
+    expect(orderID[1]).to.equal(BigNumber.from(1000).mul(await marketplace.PRICE_FACTOR()))
     expect(order.tokenId).to.equal(tokenId)
     expect(order.side).to.equal(BUY)
     expect(order.sender).to.equal(buyer.address)
-    expect(order.price).to.equal(1000)
+    expect(order.price).to.equal(BigNumber.from(1000).mul(await marketplace.PRICE_FACTOR()))
     expect(order.quantity).to.equal(1)
     // Buyer makes a buy order with higher price than asked, executes, removes executed order and refunds the excess Ether
     const buyTransaction = marketplace
@@ -233,11 +228,11 @@ describe('Talentir Marketplace Tests', function () {
     orderID = await marketplace.getBestOrder(tokenId, BUY)
     order = await marketplace.orders(orderID[0])
     expect(orderID[0]).to.equal(2)
-    expect(orderID[1]).to.equal(1000)
+    expect(orderID[1]).to.equal(BigNumber.from(1000).mul(await marketplace.PRICE_FACTOR()))
     expect(order.tokenId).to.equal(tokenId)
     expect(order.side).to.equal(BUY)
     expect(order.sender).to.equal(buyer.address)
-    expect(order.price).to.equal(1000)
+    expect(order.price).to.equal(BigNumber.from(1000).mul(await marketplace.PRICE_FACTOR()))
     expect(order.quantity).to.equal(1)
     // Create a sell order that fills the buy order
     const transaction = marketplace
@@ -553,7 +548,7 @@ describe('Talentir Marketplace Tests', function () {
       from: user.address,
       tokenId,
       side: SELL,
-      price: oneEther,
+      price: oneEther.mul(await marketplace.PRICE_FACTOR()),
       quantity: 1
     })
 
@@ -701,7 +696,7 @@ describe('Talentir Marketplace Tests', function () {
     {
       const quantity = 500
       const cost = oneEther.div(4)
-      const price = cost.div(quantity)
+      const price = cost.mul(await marketplace.PRICE_FACTOR()).div(quantity)
       const royalties = cost.mul(royaltyPercent).div(100)
       const fee = cost.mul(talentirFeePercent).div(100)
       const paidToSeller = cost.sub(royalties).sub(fee)
@@ -756,7 +751,7 @@ describe('Talentir Marketplace Tests', function () {
     {
       const quantity = 500
       const cost = oneEther.div(2)
-      const price = cost.div(quantity)
+      const price = cost.mul(await marketplace.PRICE_FACTOR()).div(quantity)
       const royalties = cost.mul(royaltyPercent).div(100)
       const fee = cost.mul(talentirFeePercent).div(100)
       const paidToSeller = cost.sub(royalties).sub(fee)
@@ -819,6 +814,10 @@ describe('Talentir Marketplace Tests', function () {
         .withNamedArgs({
           orderId,
           from: seller.address,
+          tokenId,
+          side: 1,
+          price: oneEther.mul(await marketplace.PRICE_FACTOR()).div(1_000),
+          quantity,
           asyncTransfer: true
         })
 
@@ -951,5 +950,44 @@ describe('Talentir Marketplace Tests', function () {
     // No best order
     const [orderId4] = await marketplace.getBestOrder(tokenId, 1)
     expect(orderId4).to.equal(0)
+  })
+
+  it('precision', async function () {
+    // Mint NFT
+    await talentirNFT.mint(
+      seller.address,
+      'abcd',
+      'abc',
+      royaltyReceiver.address,
+      false
+    )
+
+    const tokenId = await talentirNFT.contentIdToTokenId('abc')
+
+    // Post Buy Order
+    await expect(await marketplace.connect(buyer).makeBuyOrder(
+      buyer.address,
+      tokenId,
+      1_000,
+      true,
+      false,
+      {
+        value: 1_999
+      }
+    )).to.changeEtherBalances(
+      [buyer, marketplace],
+      [-1_999, 1_999]
+    )
+
+    // Cancel Order
+    await expect(
+      await marketplace
+        .connect(buyer)
+        .cancelOrders([1], false)
+    )
+      .to.changeEtherBalances(
+        [buyer, marketplace],
+        [1_999, -1_999]
+      )
   })
 })
