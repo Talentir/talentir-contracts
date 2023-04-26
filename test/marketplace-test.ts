@@ -657,8 +657,8 @@ describe('Talentir Marketplace Tests', function () {
   })
 
   it('async transfer / pull payment', async function () {
-    const royaltyPercent = 10
-    const talentirFeePercent = 10
+    const royaltyPercent = 7
+    const talentirFeePercent = 9
 
     await talentirNFT.setRoyalty(royaltyPercent * 1000)
     await marketplace.setTalentirFee(talentirFeePercent * 1000, talentirFeeReceiver.address)
