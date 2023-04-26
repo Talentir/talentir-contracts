@@ -652,8 +652,8 @@ describe('Talentir Marketplace Tests', function () {
   })
 
   it('async transfer / pull payment', async function () {
-    const royaltyPercent = 10
-    const talentirFeePercent = 10
+    const royaltyPercent = 7
+    const talentirFeePercent = 9
 
     await talentirNFT.setRoyalty(royaltyPercent * 1000)
     await marketplace.setTalentirFee(talentirFeePercent * 1000, talentirFeeReceiver.address)
@@ -672,18 +672,22 @@ describe('Talentir Marketplace Tests', function () {
       1_000_000
     )
 
+    const initialSellOrderQuantity = 1_000
+
     // Add sell order to orderbook
     await expect(
       marketplace
         .connect(seller)
-        .makeSellOrder(seller.address, tokenId, oneEther, 1_000, true, true)
+        .makeSellOrder(seller.address, tokenId, oneEther, initialSellOrderQuantity, true, true)
     ).to.emit(marketplace, 'OrderAdded')
+
+    const initialBuyOrderQuantity = 1_000
 
     // Add cheaper buy order to orderbook
     await expect(
       marketplace
         .connect(buyer)
-        .makeBuyOrder(buyer.address, tokenId, 1_000, true, true, {
+        .makeBuyOrder(buyer.address, tokenId, initialBuyOrderQuantity, true, true, {
           value: oneEther.div(2)
         })
     ).to.emit(marketplace, 'OrderAdded')
@@ -711,7 +715,7 @@ describe('Talentir Marketplace Tests', function () {
         royalties,
         royaltiesReceiver: royaltyReceiver.address,
         quantity,
-        remainingQuantity: 500,
+        remainingQuantity: initialBuyOrderQuantity - quantity,
         asyncTransfer: true
       })
 
@@ -768,7 +772,7 @@ describe('Talentir Marketplace Tests', function () {
           royalties,
           royaltiesReceiver: royaltyReceiver.address,
           quantity,
-          remainingQuantity: 500,
+          remainingQuantity: initialSellOrderQuantity - quantity,
           asyncTransfer: true
         })
 
@@ -800,7 +804,7 @@ describe('Talentir Marketplace Tests', function () {
     // Cancel Remaining Sell Order
     {
       const orderId = 1
-      const quantity = 500
+      const remainingQuantity = 500
 
       await expect(
         marketplace
@@ -813,7 +817,7 @@ describe('Talentir Marketplace Tests', function () {
           tokenId,
           side: 1,
           price: oneEther.mul(await marketplace.PRICE_FACTOR()).div(1_000),
-          quantity,
+          quantity: remainingQuantity,
           asyncTransfer: true
         })
 
@@ -821,7 +825,7 @@ describe('Talentir Marketplace Tests', function () {
       const sellerBalanceBefore = await talentirNFT.balanceOf(seller.address, tokenId)
       await marketplace.withdrawTokens(seller.address, tokenId)
       const sellerBalanceAfter = await talentirNFT.balanceOf(seller.address, tokenId)
-      expect(sellerBalanceAfter.sub(sellerBalanceBefore)).to.equal(quantity)
+      expect(sellerBalanceAfter.sub(sellerBalanceBefore)).to.equal(remainingQuantity)
     }
 
     // Cancel Remaining Buy Order
@@ -867,7 +871,7 @@ describe('Talentir Marketplace Tests', function () {
       false
     )
 
-    // Owner can cancel
+    // Owner can cancel order
     await expect(
       marketplace
         .connect(owner)
@@ -878,6 +882,75 @@ describe('Talentir Marketplace Tests', function () {
         from: seller.address,
         asyncTransfer: true
       })
+
+    // Token is refunded to seller, not the owner
+    const balanceBefore = await talentirNFT.balanceOf(seller.address, tokenId)
+    await marketplace.withdrawTokens(seller.address, tokenId)
+    const balanceAfter = await talentirNFT.balanceOf(seller.address, tokenId)
+    expect(balanceAfter.sub(balanceBefore)).to.equal(1_000)
+  })
+
+  it('order removed in the correct order', async function () {
+    // Mint token to seller
+    await talentirNFT.mint(
+      seller.address,
+      'abcd',
+      'abc',
+      royaltyReceiver.address,
+      false
+    )
+
+    const tokenId = await talentirNFT.contentIdToTokenId('abc')
+    const PRICE_FACTOR = await marketplace.PRICE_FACTOR()
+
+    // Order with ID 1 created
+    await expect(
+      marketplace
+        .connect(seller)
+        .makeSellOrder(seller.address, tokenId, oneEther, 1, true, false)
+    ).to.emit(marketplace, 'OrderAdded')
+      .withArgs(1, seller.address, tokenId, SELL, oneEther.mul(PRICE_FACTOR), 1)
+
+    // Order with ID 2 created
+    await expect(
+      marketplace
+        .connect(seller)
+        .makeSellOrder(seller.address, tokenId, oneEther, 1, true, false)
+    ).to.emit(marketplace, 'OrderAdded')
+      .withArgs(2, seller.address, tokenId, SELL, oneEther.mul(PRICE_FACTOR), 1)
+
+    // // Order with ID 3 created
+    await expect(
+      marketplace
+        .connect(seller)
+        .makeSellOrder(seller.address, tokenId, oneEther, 1, true, false)
+    ).to.emit(marketplace, 'OrderAdded')
+      .withArgs(3, seller.address, tokenId, SELL, oneEther.mul(PRICE_FACTOR), 1)
+
+    // Order ID 1 is the best order (posted first)
+    const [orderId1] = await marketplace.getBestOrder(tokenId, 1)
+    expect(orderId1).to.equal(1)
+
+    // Cancelling order with ID 2
+    await marketplace.connect(seller).cancelOrders([2], false)
+
+    // Order ID 1 is still the best order
+    const [orderId2] = await marketplace.getBestOrder(tokenId, 1)
+    expect(orderId2).to.equal(1)
+
+    // Cancelling order with ID 1
+    await marketplace.connect(seller).cancelOrders([1], false)
+
+    // Order ID 3 is now the best order
+    const [orderId3] = await marketplace.getBestOrder(tokenId, 1)
+    expect(orderId3).to.equal(3)
+
+    // Cancelling order with ID 3
+    await marketplace.connect(seller).cancelOrders([3], false)
+
+    // No best order
+    const [orderId4] = await marketplace.getBestOrder(tokenId, 1)
+    expect(orderId4).to.equal(0)
   })
 
   it('precision', async function () {

@@ -503,7 +503,7 @@ contract TalentirMarketplaceV1 is
         Side side = orders[orderId].side;
 
         // remove order from linked list
-        _markets[tokenId][side].orderList[price].pop(false);
+        _markets[tokenId][side].orderList[price].remove(orderId);
 
         // if this was the last remaining order, remove node from red-black tree
         if (!_markets[tokenId][side].orderList[price].listExists()) {
