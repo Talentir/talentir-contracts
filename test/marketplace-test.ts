@@ -651,11 +651,37 @@ describe('Marketplace Tests', function () {
     ).to.emit(marketplace, 'OrderAdded')
       .withArgs(2, seller.address, tokenId, SELL, oneEther, 1)
 
-    // Order with ID 2 cancelled
+    // Order with ID 3 created
+    await expect(
+      marketplace
+        .connect(seller)
+        .makeSellOrder(seller.address, tokenId, oneEther, 1, true)
+    ).to.emit(marketplace, 'OrderAdded')
+      .withArgs(3, seller.address, tokenId, SELL, oneEther, 1)
+
+    // Order ID 1 is the best order (posted first)
+    const [orderId1] = await marketplace.getBestOrder(tokenId, 1)
+    expect(orderId1).to.equal(1)
+
+    // Cancelling order with ID 2
     await marketplace.connect(seller).cancelOrders([2])
 
-    // Correct order removed
-    const [orderId] = await marketplace.getBestOrder(tokenId, 1)
-    expect(orderId).to.equal(1)
+    // Order ID 1 is still the best order
+    const [orderId2] = await marketplace.getBestOrder(tokenId, 1)
+    expect(orderId2).to.equal(1)
+
+    // Cancelling order with ID 1
+    await marketplace.connect(seller).cancelOrders([1])
+
+    // Order ID 3 is now the best order
+    const [orderId3] = await marketplace.getBestOrder(tokenId, 1)
+    expect(orderId3).to.equal(3)
+
+    // Cancelling order with ID 3
+    await marketplace.connect(seller).cancelOrders([3])
+
+    // No best order
+    const [orderId4] = await marketplace.getBestOrder(tokenId, 1)
+    expect(orderId4).to.equal(0)
   })
 })
