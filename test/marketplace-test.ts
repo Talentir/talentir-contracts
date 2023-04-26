@@ -677,18 +677,22 @@ describe('Talentir Marketplace Tests', function () {
       1_000_000
     )
 
+    const initialSellOrderQuantity = 1_000
+
     // Add sell order to orderbook
     await expect(
       marketplace
         .connect(seller)
-        .makeSellOrder(seller.address, tokenId, oneEther, 1_000, true, true)
+        .makeSellOrder(seller.address, tokenId, oneEther, initialSellOrderQuantity, true, true)
     ).to.emit(marketplace, 'OrderAdded')
+
+    const initialBuyOrderQuantity = 1_000
 
     // Add cheaper buy order to orderbook
     await expect(
       marketplace
         .connect(buyer)
-        .makeBuyOrder(buyer.address, tokenId, 1_000, true, true, {
+        .makeBuyOrder(buyer.address, tokenId, initialBuyOrderQuantity, true, true, {
           value: oneEther.div(2)
         })
     ).to.emit(marketplace, 'OrderAdded')
@@ -716,7 +720,7 @@ describe('Talentir Marketplace Tests', function () {
         royalties,
         royaltiesReceiver: royaltyReceiver.address,
         quantity,
-        remainingQuantity: 500,
+        remainingQuantity: initialBuyOrderQuantity - quantity,
         asyncTransfer: true
       })
 
@@ -773,7 +777,7 @@ describe('Talentir Marketplace Tests', function () {
           royalties,
           royaltiesReceiver: royaltyReceiver.address,
           quantity,
-          remainingQuantity: 500,
+          remainingQuantity: initialSellOrderQuantity - quantity,
           asyncTransfer: true
         })
 
@@ -805,7 +809,7 @@ describe('Talentir Marketplace Tests', function () {
     // Cancel Remaining Sell Order
     {
       const orderId = 1
-      const quantity = 500
+      const remainingQuantity = 500
 
       await expect(
         marketplace
@@ -822,7 +826,7 @@ describe('Talentir Marketplace Tests', function () {
       const sellerBalanceBefore = await talentirNFT.balanceOf(seller.address, tokenId)
       await marketplace.withdrawTokens(seller.address, tokenId)
       const sellerBalanceAfter = await talentirNFT.balanceOf(seller.address, tokenId)
-      expect(sellerBalanceAfter.sub(sellerBalanceBefore)).to.equal(quantity)
+      expect(sellerBalanceAfter.sub(sellerBalanceBefore)).to.equal(remainingQuantity)
     }
 
     // Cancel Remaining Buy Order
@@ -868,7 +872,7 @@ describe('Talentir Marketplace Tests', function () {
       false
     )
 
-    // Owner can cancel
+    // Owner can cancel order
     await expect(
       marketplace
         .connect(owner)
@@ -879,5 +883,11 @@ describe('Talentir Marketplace Tests', function () {
         from: seller.address,
         asyncTransfer: true
       })
+
+    // Token is refunded to seller, not the owner
+    const balanceBefore = await talentirNFT.balanceOf(seller.address, tokenId)
+    await marketplace.withdrawTokens(seller.address, tokenId)
+    const balanceAfter = await talentirNFT.balanceOf(seller.address, tokenId)
+    expect(balanceAfter.sub(balanceBefore)).to.equal(1_000)
   })
 })
