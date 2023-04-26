@@ -21,7 +21,7 @@ describe('TalentirNFT', function () {
 
     [admin, minter, luki, johnny] = await ethers.getSigners()
 
-    await talentir.setMinterRole(minter.address)
+    await talentir.setMinterRole(minter.address, [])
   })
 
   it('Uri', async function () {
@@ -29,7 +29,7 @@ describe('TalentirNFT', function () {
     const contentID1 = '1'
     const tokenID1 = await talentir.contentIdToTokenId(contentID1)
 
-    await talentir.setMinterRole(minter.address)
+    await talentir.setMinterRole(minter.address, [])
     await talentir
       .connect(minter)
       .mint(luki.address, cid1, contentID1, luki.address, false)
@@ -47,14 +47,14 @@ describe('TalentirNFT', function () {
     ).to.be.revertedWith('Not allowed')
 
     await expect(
-      talentir.setMinterRole(ethers.constants.AddressZero)
+      talentir.setMinterRole(ethers.constants.AddressZero, [])
     ).to.be.revertedWith('Minter is zero')
 
     await expect(
-      talentir.connect(luki).setMinterRole(minter.address)
+      talentir.connect(luki).setMinterRole(minter.address, [])
     ).to.be.revertedWith('Ownable: caller is not the owner')
 
-    await expect(talentir.setMinterRole(luki.address))
+    await expect(talentir.setMinterRole(luki.address, []))
       .to.emit(talentir, 'MinterRoleChanged')
       .withArgs(minter.address, luki.address)
   })
@@ -111,21 +111,21 @@ describe('TalentirNFT', function () {
     ).to.be.revertedWith('Token CID already used')
   })
 
-  it('can approve a marketplace to transfer tokens', async function () {
+  it('can approve a marketplace & minter to transfer tokens', async function () {
     const contentID1 = '1'
     const tokenID1 = await talentir.contentIdToTokenId(contentID1)
 
-    await talentir.setMinterRole(minter.address)
+    await talentir.setMinterRole(minter.address, [])
 
     await expect(
-      talentir.setMarketplace(ethers.constants.AddressZero)
+      talentir.setMarketplace(ethers.constants.AddressZero, [])
     ).to.be.revertedWith('Marketplace is zero')
 
     await expect(
-      talentir.connect(luki).setMarketplace(johnny.address)
+      talentir.connect(luki).setMarketplace(johnny.address, [])
     ).to.be.revertedWith('Ownable: caller is not the owner')
 
-    await expect(talentir.setMarketplace(johnny.address))
+    await expect(talentir.setMarketplace(johnny.address, []))
       .to.emit(talentir, 'MarketplaceChanged')
       .withArgs(ethers.constants.AddressZero, johnny.address)
 
@@ -139,13 +139,43 @@ describe('TalentirNFT', function () {
 
     const balance = await talentir.balanceOf(johnny.address, tokenID1)
     expect(balance).to.equal(1)
+
+    // Unapprove marketplace for Luki
+    await talentir.setMarketplace(johnny.address, [luki.address])
+
+    // Marketplace can no longer transfer
+    await expect(
+      talentir
+        .connect(johnny)
+        .safeTransferFrom(luki.address, johnny.address, tokenID1, 1, '0x')
+    )
+      .to.be.revertedWith('ERC1155: caller is not token owner or approved')
+
+    // Minter can also transfer
+    await talentir
+      .connect(minter)
+      .safeTransferFrom(luki.address, johnny.address, tokenID1, 1, '0x')
+
+    const balance2 = await talentir.balanceOf(johnny.address, tokenID1)
+    expect(balance2).to.equal(2)
+
+    // Unapprove minter
+    await talentir.setMinterRole(minter.address, [luki.address])
+
+    // Minter can no longer transfer
+    await expect(
+      talentir
+        .connect(minter)
+        .safeTransferFrom(luki.address, johnny.address, tokenID1, 1, '0x')
+    )
+      .to.be.revertedWith('ERC1155: caller is not token owner or approved')
   })
 
   it('can approve an account to transfer tokens', async function () {
     const contentID1 = '1'
     const tokenID1 = await talentir.contentIdToTokenId(contentID1)
 
-    await talentir.setMinterRole(minter.address)
+    await talentir.setMinterRole(minter.address, [])
     await talentir
       .connect(minter)
       .mint(luki.address, 'a', contentID1, luki.address, false)
@@ -170,7 +200,7 @@ describe('TalentirNFT', function () {
     const contentID = 'contentID'
     const tokenID1 = await talentir.contentIdToTokenId(contentID)
 
-    await talentir.setMinterRole(minter.address)
+    await talentir.setMinterRole(minter.address, [])
 
     await expect(
       talentir.connect(minter).mint(luki.address, 'a', contentID, johnny.address, false)
@@ -220,7 +250,7 @@ describe('TalentirNFT', function () {
     const tokenID1 = await talentir.contentIdToTokenId(contentID1)
     const tokenID2 = await talentir.contentIdToTokenId(contentID2)
 
-    await talentir.setMinterRole(minter.address)
+    await talentir.setMinterRole(minter.address, [])
 
     await talentir
       .connect(minter)
@@ -264,7 +294,8 @@ describe('TalentirNFT', function () {
     await expect(
       talentir
         .connect(johnny)
-        .safeBatchTransferFrom(luki.address, johnny.address, [tokenID1, tokenID2], [2, 3], '0x')).to.be.revertedWith('Pausable: paused')
+        .safeBatchTransferFrom(luki.address, johnny.address, [tokenID1, tokenID2], [2, 3], '0x'))
+      .to.be.revertedWith('Pausable: paused')
 
     await expect(talentir.setApprovalForAll(johnny.address, true)).to.be.revertedWith('Pausable: paused')
     // Only owner can unpause
@@ -299,7 +330,7 @@ describe('TalentirNFT', function () {
     const contentID = 'contentID'
     const tokenID1 = await talentir.contentIdToTokenId(contentID)
 
-    await talentir.setMinterRole(minter.address)
+    await talentir.setMinterRole(minter.address, [])
 
     await expect(
       talentir.connect(minter).mint(luki.address, 'a', contentID, johnny.address, false)

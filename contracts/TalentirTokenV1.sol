@@ -176,17 +176,29 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
 
     /// @notice Set the minter address.
     /// @param minterAddress The new minter address.
-    function setMinterRole(address minterAddress) public onlyOwner {
+    /// @param approvedUsers Users who have the old minter address approved. Approval will be removed.
+    function setMinterRole(address minterAddress, address[] memory approvedUsers) public onlyOwner {
         require(minterAddress != address(0), "Minter is zero");
+
+        for (uint i = 0; i < approvedUsers.length; i++) {
+            _setApprovalForAll(approvedUsers[i], _minterAddress, false);
+        }
+
         address from = _minterAddress;
         _minterAddress = minterAddress;
         emit MinterRoleChanged(from, minterAddress);
     }
 
     /// @notice Set the marketplace address.
-    /// param marketplace The new marketplace address.
-    function setMarketplace(address marketplace) public onlyOwner {
+    /// @param marketplace The new marketplace address.
+    /// @param approvedUsers Users who have the old marketplace approved. Approval will be removed.
+    function setMarketplace(address marketplace, address[] memory approvedUsers) public onlyOwner {
         require(marketplace != address(0), "Marketplace is zero");
+        
+        for (uint i = 0; i < approvedUsers.length; i++) {
+            _setApprovalForAll(approvedUsers[i], _approvedMarketplace, false);
+        }
+
         address from = _approvedMarketplace;
         _approvedMarketplace = marketplace;
         emit MarketplaceChanged(from, marketplace);

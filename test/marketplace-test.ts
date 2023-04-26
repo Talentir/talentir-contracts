@@ -32,14 +32,14 @@ describe('Marketplace Tests', function () {
     marketplace = await MarketplaceFactory.deploy(talentirNFT.address)
     await marketplace.deployed()
 
-    await talentirNFT.setMarketplace(marketplace.address)
+    await talentirNFT.setMarketplace(marketplace.address, [])
 
     // Can't mint token before minter role is set
     await expect(
       talentirNFT.mint(seller.address, 'abc', 'abc', royaltyReceiver.address, false)
     ).to.be.revertedWith('Not allowed')
     // Set minter role to owner
-    await talentirNFT.setMinterRole(owner.address)
+    await talentirNFT.setMinterRole(owner.address, [])
   })
 
   it('deploy', async function () {
