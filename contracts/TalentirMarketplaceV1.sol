@@ -250,10 +250,10 @@ contract TalentirMarketplaceV1 is
         _makeOrder(from, tokenId, Side.BUY, msg.value, tokenQuantity, addUnfilledOrderToOrderbook, useAsyncTransfer);
     }
 
-    /// @notice Cancel orders: `orders`
-    /// This function may be front-runnable. This may be abused when the order owner wants 
+    /// @notice Cancel orders: `orders`.
+    /// This function may be front-runnable. This may be abused when the order owner wants
     /// to cancel one or more unfavorable market orders. Consider using private mempools, i.e.
-    /// flashots
+    /// flashots.
     /// @dev emits OrdersCancelled event.
     /// @param orderIds array of order Ids
     /// @param useAsyncTransfer use async transfer for ETH and ERC1155 refunds. Typically should
