@@ -251,6 +251,9 @@ contract TalentirMarketplaceV1 is
     }
 
     /// @notice Cancel orders: `orders`
+    /// This function may be front-runnable. This may be abused when the order owner wants 
+    /// to cancel one or more unfavorable market orders. Consider using private mempools, i.e.
+    /// flashots
     /// @dev emits OrdersCancelled event.
     /// @param orderIds array of order Ids
     /// @param useAsyncTransfer use async transfer for ETH and ERC1155 refunds. Typically should
