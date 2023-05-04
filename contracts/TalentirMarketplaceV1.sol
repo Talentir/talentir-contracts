@@ -384,7 +384,7 @@ contract TalentirMarketplaceV1 is
 
         // Refund any remaining ETH from a buy order not added to order book
         if ((side == Side.BUY) && !(addOrderForRemaining)) {
-            require(msg.value >= ethQuantity, "Couldn't refund"); // just to be safe - don't refund more than what was sent
+            require(msg.value >= ethQuantity, "Couldn't refund"); //  just to be safe - don't refund more than what was sent
 
             // Safe to directly send ETH. In the worst case the transaction just doesn't go through.
             _ethTransfer(sender, ethQuantity);
@@ -498,7 +498,7 @@ contract TalentirMarketplaceV1 is
         }
     }
 
-    /// @dev Remove order from all data structures..
+    /// @dev Remove order from all data structures.
     function _removeOrder(uint256 orderId) private {
         uint256 price = orders[orderId].price;
         uint256 tokenId = orders[orderId].tokenId;

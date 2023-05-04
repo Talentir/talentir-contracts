@@ -21,7 +21,7 @@ describe('Talentir Token Tests', function () {
 
     [admin, minter, luki, johnny] = await ethers.getSigners()
 
-    await talentir.setMinterRole(minter.address, [])
+    await talentir.setMinterRole(minter.address)
   })
 
   it('Uri', async function () {
@@ -29,7 +29,7 @@ describe('Talentir Token Tests', function () {
     const contentID1 = '1'
     const tokenID1 = await talentir.contentIdToTokenId(contentID1)
 
-    await talentir.setMinterRole(minter.address, [])
+    await talentir.setMinterRole(minter.address)
     await talentir
       .connect(minter)
       .mint(luki.address, cid1, contentID1, luki.address, false)
@@ -47,14 +47,14 @@ describe('Talentir Token Tests', function () {
     ).to.be.revertedWith('Not minter')
 
     await expect(
-      talentir.setMinterRole(ethers.constants.AddressZero, [])
+      talentir.setMinterRole(ethers.constants.AddressZero)
     ).to.be.revertedWith('Minter is zero')
 
     await expect(
-      talentir.connect(luki).setMinterRole(minter.address, [])
+      talentir.connect(luki).setMinterRole(minter.address)
     ).to.be.revertedWith('Ownable: caller is not the owner')
 
-    await expect(talentir.setMinterRole(luki.address, []))
+    await expect(talentir.setMinterRole(luki.address))
       .to.emit(talentir, 'MinterRoleChanged')
       .withArgs(minter.address, luki.address)
   })
@@ -115,17 +115,17 @@ describe('Talentir Token Tests', function () {
     const contentID1 = '1'
     const tokenID1 = await talentir.contentIdToTokenId(contentID1)
 
-    await talentir.setMinterRole(minter.address, [])
+    await talentir.setMinterRole(minter.address)
 
     await expect(
-      talentir.setMarketplace(ethers.constants.AddressZero, [])
+      talentir.setMarketplace(ethers.constants.AddressZero)
     ).to.be.revertedWith('Marketplace is zero')
 
     await expect(
-      talentir.connect(luki).setMarketplace(johnny.address, [])
+      talentir.connect(luki).setMarketplace(johnny.address)
     ).to.be.revertedWith('Ownable: caller is not the owner')
 
-    await expect(talentir.setMarketplace(johnny.address, []))
+    await expect(talentir.setMarketplace(johnny.address))
       .to.emit(talentir, 'MarketplaceChanged')
       .withArgs(ethers.constants.AddressZero, johnny.address)
 
@@ -133,23 +133,13 @@ describe('Talentir Token Tests', function () {
       .connect(minter)
       .mint(luki.address, 'a', contentID1, luki.address, false)
 
+    // Marketplace can transfer
     await talentir
       .connect(johnny)
       .safeTransferFrom(luki.address, johnny.address, tokenID1, 1, '0x')
 
     const balance = await talentir.balanceOf(johnny.address, tokenID1)
     expect(balance).to.equal(1)
-
-    // Unapprove marketplace for Luki
-    await talentir.setMarketplace(johnny.address, [luki.address])
-
-    // Marketplace can no longer transfer
-    await expect(
-      talentir
-        .connect(johnny)
-        .safeTransferFrom(luki.address, johnny.address, tokenID1, 1, '0x')
-    )
-      .to.be.revertedWith('ERC1155: caller is not token owner or approved')
 
     // Minter can also transfer
     await talentir
@@ -159,23 +149,41 @@ describe('Talentir Token Tests', function () {
     const balance2 = await talentir.balanceOf(johnny.address, tokenID1)
     expect(balance2).to.equal(2)
 
-    // Unapprove minter
-    await talentir.setMinterRole(minter.address, [luki.address])
+    // Try to remove approvals
+    await expect(talentir.connect(johnny).removeApprovals(johnny.address, [luki.address]))
+      .to.be.revertedWith('Ownable: caller is not the owner')
 
-    // Minter can no longer transfer
-    await expect(
-      talentir
-        .connect(minter)
-        .safeTransferFrom(luki.address, johnny.address, tokenID1, 1, '0x')
-    )
-      .to.be.revertedWith('ERC1155: caller is not token owner or approved')
+    await expect(talentir.removeApprovals(ethers.constants.AddressZero, [luki.address]))
+      .to.be.revertedWith('Operator is zero')
+
+    await expect(talentir.removeApprovals(johnny.address, []))
+      .to.be.revertedWith('No user wallets')
+
+    await expect(talentir.removeApprovals(johnny.address, [ethers.constants.AddressZero]))
+      .to.be.revertedWith('User wallet is zero')
+
+    // Can revoke approvals for marketplace
+    await expect(talentir.removeApprovals(johnny.address, [luki.address]))
+      .to.emit(talentir, 'ApprovalForAll').withNamedArgs({
+        account: luki.address,
+        operator: johnny.address,
+        approved: false
+      })
+
+    // Can revoke approvals for minter
+    await expect(talentir.removeApprovals(minter.address, [luki.address]))
+      .to.emit(talentir, 'ApprovalForAll').withNamedArgs({
+        account: luki.address,
+        operator: minter.address,
+        approved: false
+      })
   })
 
   it('can approve an account to transfer tokens', async function () {
     const contentID1 = '1'
     const tokenID1 = await talentir.contentIdToTokenId(contentID1)
 
-    await talentir.setMinterRole(minter.address, [])
+    await talentir.setMinterRole(minter.address)
     await talentir
       .connect(minter)
       .mint(luki.address, 'a', contentID1, luki.address, false)
@@ -200,7 +208,7 @@ describe('Talentir Token Tests', function () {
     const contentID = 'contentID'
     const tokenID1 = await talentir.contentIdToTokenId(contentID)
 
-    await talentir.setMinterRole(minter.address, [])
+    await talentir.setMinterRole(minter.address)
 
     await expect(
       talentir.connect(minter).mint(luki.address, 'a', contentID, johnny.address, false)
@@ -250,7 +258,7 @@ describe('Talentir Token Tests', function () {
     const tokenID1 = await talentir.contentIdToTokenId(contentID1)
     const tokenID2 = await talentir.contentIdToTokenId(contentID2)
 
-    await talentir.setMinterRole(minter.address, [])
+    await talentir.setMinterRole(minter.address)
 
     await talentir
       .connect(minter)
@@ -330,7 +338,7 @@ describe('Talentir Token Tests', function () {
     const contentID = 'contentID'
     const tokenID1 = await talentir.contentIdToTokenId(contentID)
 
-    await talentir.setMinterRole(minter.address, [])
+    await talentir.setMinterRole(minter.address)
 
     await expect(
       talentir.connect(minter).mint(luki.address, 'a', contentID, johnny.address, false)
