@@ -498,7 +498,7 @@ contract TalentirMarketplaceV1 is
         }
     }
 
-    /// @dev Remove order from all data structures..
+    /// @dev Remove order from all data structures.
     function _removeOrder(uint256 orderId) private {
         uint256 price = orders[orderId].price;
         uint256 tokenId = orders[orderId].tokenId;

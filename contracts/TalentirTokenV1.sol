@@ -197,13 +197,8 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
 
     /// @notice Set the minter address.
     /// @param newMinterAddress The new minter address.
-    /// @param approvedUsers Users who have the old minter address approved. Approval will be removed.
-    function setMinterRole(address newMinterAddress, address[] memory approvedUsers) external onlyOwner {
+    function setMinterRole(address newMinterAddress) external onlyOwner {
         require(newMinterAddress != address(0), "Minter is zero");
-
-        for (uint i = 0; i < approvedUsers.length; i++) {
-            _setApprovalForAll(approvedUsers[i], newMinterAddress, false);
-        }
 
         address from = minterAddress;
         minterAddress = newMinterAddress;
@@ -211,18 +206,28 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     }
 
     /// @notice Set the marketplace address.
-    /// @param netMarketplace The new marketplace address.
-    /// @param approvedUsers Users who have the old marketplace approved. Approval will be removed.
-    function setMarketplace(address netMarketplace, address[] memory approvedUsers) external onlyOwner {
-        require(netMarketplace != address(0), "Marketplace is zero");
-
-        for (uint i = 0; i < approvedUsers.length; i++) {
-            _setApprovalForAll(approvedUsers[i], netMarketplace, false);
-        }
+    /// @param newMarketplace The new marketplace address.
+    function setMarketplace(address newMarketplace) external onlyOwner {
+        require(newMarketplace != address(0), "Marketplace is zero");
 
         address from = approvedMarketplace;
-        approvedMarketplace = netMarketplace;
-        emit MarketplaceChanged(from, netMarketplace);
+        approvedMarketplace = newMarketplace;
+        emit MarketplaceChanged(from, newMarketplace);
+    }
+
+    /// @notice Remove the approval of operators for user wallets
+    /// This is useful to unapprove the old minter and marketplace addresses
+    /// Note: This function can only be used to remove approvals
+    /// @param operator The currently approved address.
+    /// @param userWallets The user wallets to remove the approvals for.
+    function removeApprovals(address operator, address[] memory userWallets) public onlyOwner {
+        require(operator != address(0), "Operator is zero");
+        require(userWallets.length > 0, "No user wallets");
+
+        for (uint i = 0; i < userWallets.length; i++) {
+            require(userWallets[i] != address(0), "User wallet is zero");
+            _setApprovalForAll(userWallets[i], operator, false);
+        }
     }
 
     /// ONLY OPERATOR FUNCTIONS ///
