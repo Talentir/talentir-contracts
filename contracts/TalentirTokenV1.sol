@@ -145,7 +145,7 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     /// @param user The user to set the allowance for.
     /// @param allowance The allowance to set.
     function setGlobalPresaleAllowance(address user, bool allowance) external onlyMinter {
-        require(user != address(0), "User is zero");
+        require(user != address(0), "user is zero");
         require(hasGlobalPresaleAllowance[user] != allowance, "Already set");
         hasGlobalPresaleAllowance[user] = allowance;
         emit GlobalPresaleAllowanceSet(user, allowance);
@@ -157,7 +157,7 @@ contract TalentirTokenV1 is ERC1155(""), TalentirERC2981, DefaultOperatorFiltere
     /// @param tokenId The token to set the allowance for.
     /// @param allowance The allowance to set.
     function setTokenPresaleAllowance(address user, uint256 tokenId, bool allowance) external onlyMinter {
-        require(user != address(0), "User is zero");
+        require(user != address(0), "user is zero");
         require(talents[tokenId] != address(0), "tokenId not found");
         require(hasTokenPresaleAllowance[user][tokenId] != allowance, "Already set");
         hasTokenPresaleAllowance[user][tokenId] = allowance;

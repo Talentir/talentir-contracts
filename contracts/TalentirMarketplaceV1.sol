@@ -308,7 +308,7 @@ contract TalentirMarketplaceV1 is
     /// @param wallet address where Talentir fee will be sent to
     function setTalentirFee(uint256 fee, address wallet) external onlyOwner {
         require(wallet != address(0), "Wallet is zero");
-        require(fee <= ONE_HUNDRED_PERCENT / 10, "Must be <=10k"); // Talentir fee can never be higher than 10%
+        require(fee <= ONE_HUNDRED_PERCENT / 10, "Must be <= 10%"); // Talentir fee can never be higher than 10%
         talentirFeePercent = fee;
         talentirFeeWallet = wallet;
 

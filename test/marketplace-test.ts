@@ -287,7 +287,7 @@ describe('Talentir Marketplace Tests', function () {
     // Can't set too high fees
     await expect(
       marketplace.setTalentirFee(10001, talentirFeeReceiver.address)
-    ).to.be.revertedWith('Must be <=10k')
+    ).to.be.revertedWith('Must be <= 10%')
     // Set fees
     await expect(
       marketplace.setTalentirFee(10000, talentirFeeReceiver.address)

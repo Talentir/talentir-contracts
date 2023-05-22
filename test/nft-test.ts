@@ -466,7 +466,7 @@ describe('Talentir Token Tests', function () {
       talentir
         .connect(minter)
         .setGlobalPresaleAllowance(ethers.constants.AddressZero, true)
-    ).to.be.revertedWith('User is zero')
+    ).to.be.revertedWith('user is zero')
 
     // Only minter can set global presale allowance
     await expect(
@@ -529,7 +529,7 @@ describe('Talentir Token Tests', function () {
       talentir
         .connect(minter)
         .setTokenPresaleAllowance(ethers.constants.AddressZero, tokenID1, true)
-    ).to.be.revertedWith('User is zero')
+    ).to.be.revertedWith('user is zero')
 
     await expect(
       talentir
