@@ -991,4 +991,38 @@ describe('Talentir Marketplace Tests', function () {
         [1_999, -1_999]
       )
   })
+
+  it.only('refund bug', async function () {
+    await talentirNFT.mint(
+      seller.address,
+      'abcd',
+      'abc',
+      royaltyReceiver.address,
+      false
+    )
+    const tokenId = await talentirNFT.contentIdToTokenId('abc')
+
+    // Seller sells 2 tokens for 1 ETH
+    await expect(
+      marketplace
+        .connect(seller)
+        .makeSellOrder(seller.address, tokenId, oneEther, 2, true, false)
+    ).to.emit(marketplace, 'OrderAdded')
+
+    // Buyer overpays and only wants 1 token for 1 ETH, sets addUnfilledOrderToOrderbook to `true`. 
+    await expect(
+      marketplace
+        .connect(buyer)
+        .makeBuyOrder(buyer.address, tokenId, 1, true, false, {
+          value: oneEther
+        })
+    ).to.emit(marketplace, 'OrderExecuted')
+
+    // get balance of marketplace
+    const balanceOfMarketplace = await ethers.provider.getBalance(marketplace.address)
+  
+    // expect balance of marketplace to be zero, since there's no open buy order in the marketplace.
+    // ERROR: Marketplace Balance is 0.5 ETH, it should have been returned to the buyer. 0.5 ETH are now stuck in the contract, unrecoverable.
+    expect(balanceOfMarketplace).to.equal(0)
+  })
 })
