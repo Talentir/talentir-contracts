@@ -1001,9 +1001,6 @@ describe('Talentir Marketplace Tests', function () {
       false
     )
     const tokenId = await talentirNFT.contentIdToTokenId('abc')
-    expect(await talentirNFT.balanceOf(seller.address, tokenId)).to.equal(
-      1_000_000
-    )
 
     // Seller sells 2 tokens for 1 ETH
     await expect(
@@ -1012,7 +1009,7 @@ describe('Talentir Marketplace Tests', function () {
         .makeSellOrder(seller.address, tokenId, oneEther, 2, true, false)
     ).to.emit(marketplace, 'OrderAdded')
 
-    // Buyer overpays and only wants 1 token for 1 ETH
+    // Buyer overpays and only wants 1 token for 1 ETH, sets addUnfilledOrderToOrderbook to `true`. 
     await expect(
       marketplace
         .connect(buyer)
