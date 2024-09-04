@@ -1,4 +1,4 @@
-import type { HardhatUserConfig } from "hardhat/config";
+import { type HardhatUserConfig, vars } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox-viem";
 import "@nomicfoundation/hardhat-ledger";
 import "@nomicfoundation/hardhat-ignition-viem";
@@ -14,17 +14,18 @@ const config: HardhatUserConfig = {
     },
     networks: {
         "base-sepolia": {
-            url: `https://base-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}}`,
+            url: `https://base-sepolia.g.alchemy.com/v2/${vars.get("ALCHEMY_API_KEY")}}`,
             ledgerAccounts: ["0x6480B75A63995ba4748b44A6179fAEC2DcdCf378"]
         },
         base: {
-            url: `https://base-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}}`,
+            url: `https://base-mainnet.g.alchemy.com/v2/${vars.get("ALCHEMY_API_KEY")}}`,
             ledgerAccounts: ["0x6480B75A63995ba4748b44A6179fAEC2DcdCf378"]
         }
     },
     etherscan: {
         apiKey: {
-            "base-sepolia": process.env.BASESCAN_API_KEY ?? "",
+            "base-sepolia": vars.get("BASESCAN_API_KEY"),
+            base: vars.get("BASESCAN_API_KEY"),
         },
         customChains: [
             {
