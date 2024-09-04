@@ -13,22 +13,34 @@ const config: HardhatUserConfig = {
         }
     },
     networks: {
-        baseTest: {
-            url: "https://base-sepolia.g.alchemy.com/v2/",
-            ledgerAccounts: ["0xC0e15aFE5DdDA700f45F05d5c94f19d82951BCFE"]
+        "base-sepolia": {
+            url: `https://base-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}}`,
+            ledgerAccounts: ["0x6480B75A63995ba4748b44A6179fAEC2DcdCf378"]
+        },
+        base: {
+            url: `https://base-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}}`,
+            ledgerAccounts: ["0x6480B75A63995ba4748b44A6179fAEC2DcdCf378"]
         }
     },
     etherscan: {
         apiKey: {
-            baseTest: ""
+            "base-sepolia": process.env.BASESCAN_API_KEY ?? "",
         },
         customChains: [
             {
-                network: "baseTest",
+                network: "base-sepolia",
                 chainId: 84532,
                 urls: {
                     apiURL: "https://api-sepolia.basescan.org/api",
                     browserURL: "https://sepolia.basescan.org/"
+                }
+            },
+            {
+                network: "base",
+                chainId: 8453,
+                urls: {
+                    apiURL: "https://api.basescan.org/api",
+                    browserURL: "https://basescan.org/"
                 }
             }
         ]

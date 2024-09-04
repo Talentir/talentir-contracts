@@ -6,7 +6,6 @@ const proxyModule = buildModule("ProxyModule", (m) => {
 
     const initialize = m.encodeFunctionCall(talentirContractV2, 'initialize', [
         deployer,
-        deployer,
         deployer
     ]);
 

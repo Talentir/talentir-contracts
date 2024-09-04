@@ -1,11 +1,9 @@
 import {
-    time,
     loadFixture,
 } from "@nomicfoundation/hardhat-toolbox-viem/network-helpers";
-import { expect } from "chai";
 import hre from "hardhat";
-import { getAddress, parseGwei } from "viem";
 import talentirModule from "../ignition/modules/talentir-token-v2";
+import { expect } from "chai"
 
 describe("Lock", function () {
     // We define a fixture to reuse the same setup in every test.
@@ -29,9 +27,11 @@ describe("Lock", function () {
     }
 
     describe("Deployment", function () {
-        it("Should set the right unlockTime", async function () {
-            const { talentirToken } = await loadFixture(deployTalentirTokenFixture);
-            console.log(await talentirToken.read.URI_SETTER_ROLE())
+        it("Revert duplciate mint", async function () {
+            const { talentirToken, owner } = await loadFixture(deployTalentirTokenFixture);
+
+            await expect(talentirToken.write.mint([owner.account.address, 0n, "0x"])).not.to.be.rejected;
+            await expect(talentirToken.write.mint([owner.account.address, 0n, "0x"])).to.be.rejectedWith("Token already minted");
         });
     });
 

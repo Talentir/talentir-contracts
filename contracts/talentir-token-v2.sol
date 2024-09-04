@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155BurnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155SupplyUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 contract TalentirTokenV2 is
@@ -13,10 +14,9 @@ contract TalentirTokenV2 is
     ERC1155Upgradeable,
     AccessControlUpgradeable,
     ERC1155PausableUpgradeable,
-    ERC1155BurnableUpgradeable
+    ERC1155BurnableUpgradeable,
+    ERC1155SupplyUpgradeable
 {
-    bytes32 public constant URI_SETTER_ROLE = keccak256("URI_SETTER_ROLE");
-    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -26,47 +26,38 @@ contract TalentirTokenV2 is
 
     function initialize(
         address defaultAdmin,
-        address pauser,
         address minter
     ) public initializer {
         __ERC1155_init("https://talentir.com/api/token");
         __AccessControl_init();
         __ERC1155Pausable_init();
         __ERC1155Burnable_init();
+        __ERC1155Supply_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
-        _grantRole(PAUSER_ROLE, pauser);
         _grantRole(MINTER_ROLE, minter);
     }
 
-    function setURI(string memory newuri) public onlyRole(URI_SETTER_ROLE) {
+    function setURI(string memory newuri) public onlyRole(DEFAULT_ADMIN_ROLE) {
         _setURI(newuri);
     }
 
-    function pause() public onlyRole(PAUSER_ROLE) {
+    function pause() public onlyRole(DEFAULT_ADMIN_ROLE) {
         _pause();
     }
 
-    function unpause() public onlyRole(PAUSER_ROLE) {
+    function unpause() public onlyRole(DEFAULT_ADMIN_ROLE) {
         _unpause();
     }
 
     function mint(
         address account,
         uint256 id,
-        uint256 amount,
         bytes memory data
     ) public onlyRole(MINTER_ROLE) {
-        _mint(account, id, amount, data);
-    }
+        require(totalSupply(id) == 0, "Token already minted");
 
-    function mintBatch(
-        address to,
-        uint256[] memory ids,
-        uint256[] memory amounts,
-        bytes memory data
-    ) public onlyRole(MINTER_ROLE) {
-        _mintBatch(to, ids, amounts, data);
+        _mint(account, id, 1_000_000, data);
     }
 
     // The following functions are overrides required by Solidity.
@@ -76,7 +67,14 @@ contract TalentirTokenV2 is
         address to,
         uint256[] memory ids,
         uint256[] memory values
-    ) internal override(ERC1155Upgradeable, ERC1155PausableUpgradeable) {
+    )
+        internal
+        override(
+            ERC1155Upgradeable,
+            ERC1155PausableUpgradeable,
+            ERC1155SupplyUpgradeable
+        )
+    {
         super._update(from, to, ids, values);
     }
 
