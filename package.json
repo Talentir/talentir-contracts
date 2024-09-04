@@ -3,7 +3,7 @@
     "devDependencies": {
         "@nomicfoundation/hardhat-ledger": "^1.0.3",
         "@nomicfoundation/hardhat-toolbox-viem": "^3.0.0",
-        "hardhat": "^2.22.9"
+        "hardhat": "^2.22.10"
     },
     "dependencies": {
         "@openzeppelin/contracts": "^5.0.2",

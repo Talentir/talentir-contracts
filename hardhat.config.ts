@@ -8,17 +8,18 @@ const config: HardhatUserConfig = {
     ignition: {
         strategyConfig: {
             create2: {
-                salt: "0xe32a11d7818cf11208414d61810850515b05acfae2e6dd8a440193de16013718"
+                salt: "0xe32a11d7818cf11208414d61810850515b05acfae2e6dd8a440193de16013714"
             }
         }
     },
     networks: {
         "base-sepolia": {
-            url: `https://base-sepolia.g.alchemy.com/v2/${vars.get("ALCHEMY_API_KEY")}}`,
-            ledgerAccounts: ["0x6480B75A63995ba4748b44A6179fAEC2DcdCf378"]
+            url: `https://base-sepolia.g.alchemy.com/v2/${vars.get("ALCHEMY_API_KEY")}`,
+            ledgerAccounts: ["0x6480B75A63995ba4748b44A6179fAEC2DcdCf378"],
+            gasPrice: 1500000
         },
         base: {
-            url: `https://base-mainnet.g.alchemy.com/v2/${vars.get("ALCHEMY_API_KEY")}}`,
+            url: `https://base-mainnet.g.alchemy.com/v2/${vars.get("ALCHEMY_API_KEY")}`,
             ledgerAccounts: ["0x6480B75A63995ba4748b44A6179fAEC2DcdCf378"]
         }
     },

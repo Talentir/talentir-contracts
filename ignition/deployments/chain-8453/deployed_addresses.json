@@ -1,0 +1,6 @@
+{
+  "ProxyModule#TalentirTokenV2": "0x330acEae69B157c021465986101f37AE6a7f2863",
+  "ProxyModule#TransparentUpgradeableProxy": "0x09d3EcBed88F80E3197BF5Eda2bd62Cc27b907e8",
+  "ProxyModule#ProxyAdmin": "0x3b0E22198eE45d72E3f661B86b46A19005a7C716",
+  "TalentirModule#TalentirTokenV2": "0x09d3EcBed88F80E3197BF5Eda2bd62Cc27b907e8"
+}
