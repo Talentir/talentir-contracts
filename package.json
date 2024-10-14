@@ -1,6 +1,7 @@
 {
     "name": "hardhat-project",
     "devDependencies": {
+        "@biomejs/biome": "1.9.3",
         "@nomicfoundation/hardhat-ledger": "^1.0.3",
         "@nomicfoundation/hardhat-toolbox-viem": "^3.0.0",
         "hardhat": "^2.22.10"
@@ -11,6 +12,7 @@
     },
     "scripts": {
         "deploy-base-sepolia": "bun run hardhat ignition deploy ignition/modules/talentir-token-v2.ts --network base-sepolia --strategy create2 --verify",
-        "deploy-base": "bun run hardhat ignition deploy ignition/modules/talentir-token-v2.ts --network base --strategy create2 --verify"
+        "deploy-base": "bun run hardhat ignition deploy ignition/modules/talentir-token-v2.ts --network base --strategy create2 --verify",
+        "lint-fix": "bunx biome check --write"
     }
 }

@@ -8,20 +8,20 @@ const config: HardhatUserConfig = {
     ignition: {
         strategyConfig: {
             create2: {
-                salt: "0xe32a11d7818cf11208414d61810850515b05acfae2e6dd8a440193de16013714"
-            }
-        }
+                salt: "0xe32a11d7818cf11208414d61810850515b05acfae2e6dd8a440193de16013714",
+            },
+        },
     },
     networks: {
         "base-sepolia": {
             url: `https://base-sepolia.g.alchemy.com/v2/${vars.get("ALCHEMY_API_KEY")}`,
             ledgerAccounts: ["0x6480B75A63995ba4748b44A6179fAEC2DcdCf378"],
-            gasPrice: 1500000
+            gasPrice: 1500000,
         },
         base: {
             url: `https://base-mainnet.g.alchemy.com/v2/${vars.get("ALCHEMY_API_KEY")}`,
-            ledgerAccounts: ["0x6480B75A63995ba4748b44A6179fAEC2DcdCf378"]
-        }
+            ledgerAccounts: ["0x6480B75A63995ba4748b44A6179fAEC2DcdCf378"],
+        },
     },
     etherscan: {
         apiKey: {
@@ -34,20 +34,19 @@ const config: HardhatUserConfig = {
                 chainId: 84532,
                 urls: {
                     apiURL: "https://api-sepolia.basescan.org/api",
-                    browserURL: "https://sepolia.basescan.org/"
-                }
+                    browserURL: "https://sepolia.basescan.org/",
+                },
             },
             {
                 network: "base",
                 chainId: 8453,
                 urls: {
                     apiURL: "https://api.basescan.org/api",
-                    browserURL: "https://basescan.org/"
-                }
-            }
-        ]
-    }
-
+                    browserURL: "https://basescan.org/",
+                },
+            },
+        ],
+    },
 };
 
 export default config;
