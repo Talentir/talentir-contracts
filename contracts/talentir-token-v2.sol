@@ -15,16 +15,16 @@ contract TalentirTokenV2 is
     ERC1155PausableUpgradeable,
     ERC1155SupplyUpgradeable
 {
+    /// @custom:oz-upgrades-unsafe-allow constructor.
+    constructor() {
+        _disableInitializers();
+    }
+
     /// @notice Role to mint new tokens.
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     /// @notice The total amount of tokens per token ID.
     uint256 public constant TOKEN_FRACTIONS = 1_000_000;
-
-    /// @custom:oz-upgrades-unsafe-allow constructor.
-    constructor() {
-        _disableInitializers();
-    }
 
     /// @notice Initialize the contract with the default admin and minter roles.
     /// @param defaultAdmin The address that will be granted the DEFAULT_ADMIN_ROLE.
