@@ -1,13 +1,6 @@
-# Sample Hardhat Project
+# Talentir Token Contract V2
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a Hardhat Ignition module that deploys that contract.
+## Standards
+The Talentir Token Contract adheres to the following standards:
 
-Try running some of the following tasks:
-
-```shell
-npx hardhat help
-npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat ignition deploy ./ignition/modules/Lock.ts
-```
+- [ERC-1155](https://eips.ethereum.org/EIPS/eip-1155): This Multi-Token Standard enables fractional NFT ownership.
