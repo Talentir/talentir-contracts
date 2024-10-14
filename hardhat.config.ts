@@ -1,71 +1,52 @@
-import * as dotenv from 'dotenv'
-
-import { HardhatUserConfig, task } from 'hardhat/config'
-import '@nomiclabs/hardhat-etherscan'
-import '@nomiclabs/hardhat-waffle'
-import '@typechain/hardhat'
-import 'hardhat-gas-reporter'
-import 'solidity-coverage'
-
-require('hardhat-contract-sizer')
-
-dotenv.config()
-
-// This is a sample Hardhat task. To learn how to create your own go to
-// https://hardhat.org/guides/create-task.html
-task('accounts', 'Prints the list of accounts', async (taskArgs, hre) => {
-  const accounts = await hre.ethers.getSigners()
-
-  for (const account of accounts) {
-    console.log(account.address)
-  }
-})
-
-// You need to export an object to set up your config
-// Go to https://hardhat.org/config/ to learn more
+import { type HardhatUserConfig, vars } from "hardhat/config";
+import "@nomicfoundation/hardhat-toolbox-viem";
+import "@nomicfoundation/hardhat-ledger";
+import "@nomicfoundation/hardhat-ignition-viem";
 
 const config: HardhatUserConfig = {
-  solidity: {
-    version: '0.8.17',
-    settings: {
-      viaIR: false,
-      optimizer: {
-        enabled: true,
-        runs: 200
-      }
-    }
-  },
-  networks: {
-    goerli: {
-      url: process.env.GOERLI_URL ?? '',
-      accounts:
-        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : []
+    solidity: "0.8.24",
+    ignition: {
+        strategyConfig: {
+            create2: {
+                salt: "0xe32a11d7818cf11208414d61810850515b05acfae2e6dd8a440193de16013714",
+            },
+        },
     },
-    arbitrumOne: {
-      url: process.env.ARBITRUM_URL ?? '',
-      accounts:
-        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : []
+    networks: {
+        "base-sepolia": {
+            url: `https://base-sepolia.g.alchemy.com/v2/${vars.get("ALCHEMY_API_KEY")}`,
+            ledgerAccounts: ["0x6480B75A63995ba4748b44A6179fAEC2DcdCf378"],
+            gasPrice: 1500000,
+        },
+        base: {
+            url: `https://base-mainnet.g.alchemy.com/v2/${vars.get("ALCHEMY_API_KEY")}`,
+            ledgerAccounts: ["0x6480B75A63995ba4748b44A6179fAEC2DcdCf378"],
+        },
     },
-    arbitrumGoerli: {
-      url: process.env.ARBITRUM_GOERLI_URL ?? '',
-      accounts:
-        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : []
-    }
-  },
-  gasReporter: {
-    enabled: process.env.REPORT_GAS !== undefined,
-    currency: 'EUR',
-    coinmarketcap: '2dfd2e2c-7816-4596-8a6d-c6faa14697ea',
-    token: 'ETH'
-  },
-  etherscan: {
-    apiKey: {
-      mainnet: process.env.ETHERSCAN_API_KEY ?? '',
-      goerli: process.env.ETHERSCAN_API_KEY ?? '',
-      arbitrumOne: process.env.ARBISCAN_API_KEY ?? '',
-      arbitrumGoerli: process.env.ARBISCAN_API_KEY ?? ''
-    }
-  }
-}
+    etherscan: {
+        apiKey: {
+            "base-sepolia": vars.get("BASESCAN_API_KEY"),
+            base: vars.get("BASESCAN_API_KEY"),
+        },
+        customChains: [
+            {
+                network: "base-sepolia",
+                chainId: 84532,
+                urls: {
+                    apiURL: "https://api-sepolia.basescan.org/api",
+                    browserURL: "https://sepolia.basescan.org/",
+                },
+            },
+            {
+                network: "base",
+                chainId: 8453,
+                urls: {
+                    apiURL: "https://api.basescan.org/api",
+                    browserURL: "https://basescan.org/",
+                },
+            },
+        ],
+    },
+};
 
-export default config
+export default config;
